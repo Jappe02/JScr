@@ -1,0 +1,4 @@
+namespace;
+
+/// Prints a message to the console.
+public external("Print") void print(dynamic obj);

@@ -1,0 +1,5 @@
+namespace Math;
+
+public int abs(int a) {
+    // TODO: Abs
+}

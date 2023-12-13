@@ -1,0 +1,71 @@
+/*
+Imports
+*/
+import "external/potato.jscr";
+import "lang/print";
+
+// Field
+public const float CONSTANT_VARIABLE = [1.0, 1.5, 2.0];
+private string myString = "a string";
+public int integerNumber = null;
+
+// External Field, Can never have a body.
+private external("Potatohead") string:get something;
+
+// TODO
+type ThisIsAType {
+    // Contains members and a constructor and destructor
+
+    public ThisIsAType() {
+
+    }
+
+    public ~ThisIsAType() {
+
+    }
+}
+
+// Uses generics
+type ThisIsAType<T> {
+
+    // use T anywhere as dynamic
+
+    public ThisIsAType() {
+        if (T is string) print("T is a string!");
+    }
+
+    public ~ThisIsAType() {
+
+    }
+}
+
+// Function
+public void myFunction() {
+    bool b = otherFunction();
+
+    funcWithCallback((b) {
+        print("callback received!");
+    });
+
+    if (true) {
+
+    } else if (false) {
+
+    } else {
+        
+    }
+
+    for (int i = 0; i < 5; i++) {
+        
+    }
+
+    return;
+}
+
+private bool otherFunction() {
+    return false;
+}
+
+private void funcWithCallback(void function(bool) onSomething) {
+    onSomething();
+}

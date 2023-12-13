@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34309.116
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JScr", "JScr\JScr.csproj", "{DF1892A1-281F-4A37-87DA-9DD5594357AD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestApp", "TestApp\TestApp.csproj", "{964A0747-8621-4FFE-9A1F-27FD7F4F3AF2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DF1892A1-281F-4A37-87DA-9DD5594357AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DF1892A1-281F-4A37-87DA-9DD5594357AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DF1892A1-281F-4A37-87DA-9DD5594357AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DF1892A1-281F-4A37-87DA-9DD5594357AD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{964A0747-8621-4FFE-9A1F-27FD7F4F3AF2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{964A0747-8621-4FFE-9A1F-27FD7F4F3AF2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{964A0747-8621-4FFE-9A1F-27FD7F4F3AF2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{964A0747-8621-4FFE-9A1F-27FD7F4F3AF2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3B0EFDAE-D20E-497F-99B5-76B58C880EEC}
+	EndGlobalSection
+EndGlobal
