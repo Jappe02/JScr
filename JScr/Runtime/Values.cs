@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
+﻿using System.Text.Json;
 using static JScr.Frontend.Ast;
 
 namespace JScr.Runtime
@@ -22,66 +17,64 @@ namespace JScr.Runtime
 
         public abstract class RuntimeVal
         {
-            public readonly ValueType Type;
+            public ValueType Type { get; }
 
             public RuntimeVal(ValueType type) { Type = type; }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class NullVal : RuntimeVal
         {
-            public readonly dynamic? Value;
+            public dynamic? Value { get; }
 
             public NullVal() : base(ValueType.null_) { Value = null; }
 
-            public override string ToString() => JsonSerializer.Serialize(this);
+            public override string ToString() => Value.ToString() ?? "";
         }
 
         public class BoolVal : RuntimeVal
         {
-            public readonly bool Value;
+            public bool Value { get; }
 
             public BoolVal(bool value = true) : base(ValueType.boolean) { Value = value; }
 
-            public override string ToString() => JsonSerializer.Serialize(this);
+            public override string ToString() => Value.ToString();
         }
 
         public class NumberVal : RuntimeVal
         {
-            public readonly float Value;
+            public float Value { get; }
 
             public NumberVal(float value = 0) : base(ValueType.number) { Value = value; }
 
-            public override string ToString() => JsonSerializer.Serialize(this);
+            public override string ToString() => Value.ToString();
         }
 
         public class ObjectVal : RuntimeVal
         {
-            public readonly Dictionary<string, RuntimeVal> Properties;
+            public Dictionary<string, RuntimeVal> Properties { get; }
 
             public ObjectVal(Dictionary<string, RuntimeVal> properties) : base(ValueType.object_) { Properties = properties; }
 
-            public override string ToString() => JsonSerializer.Serialize(this);
+            public override string ToString() => Properties.ToJson();
         }
 
         public delegate RuntimeVal FunctionCall(RuntimeVal[] args, Environment env);
 
         public class NativeFnVal : RuntimeVal
         {
-            public readonly FunctionCall Call;
+            public FunctionCall Call { get; }
 
             public NativeFnVal(FunctionCall call) : base(ValueType.nativeFn) { Call = call; }
 
-            public override string ToString() => JsonSerializer.Serialize(this);
+            public override string ToString() => Call.ToString() ?? "NativeFnVal";
         }
 
         public class FunctionVal : RuntimeVal
         {
-            public readonly string Name;
-            public readonly string[] Parameters;
-            public readonly Environment DeclarationEnv;
-            public readonly Stmt[] Body;
+            public string Name { get; }
+            public string[] Parameters { get; }
+            public Environment DeclarationEnv { get; }
+            public Stmt[] Body { get; }
 
             public FunctionVal(string name, string[] parameters, Environment declarationEnv, Stmt[] body) : base(ValueType.function)
             {
@@ -91,7 +84,7 @@ namespace JScr.Runtime
                 Body = body;
             }
 
-            public override string ToString() => JsonSerializer.Serialize(this);
+            public override string ToString() => this.ToJson();
         }
     }
 }

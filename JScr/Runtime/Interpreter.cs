@@ -1,13 +1,7 @@
 ﻿using JScr.Frontend;
 using JScr.Runtime.Eval;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using static JScr.Frontend.Ast;
 using static JScr.Runtime.Values;
-using ValueType = JScr.Runtime.Values.ValueType;
 
 namespace JScr.Runtime
 {
@@ -44,6 +38,8 @@ namespace JScr.Runtime
                     return Statements.EvalVarDeclaration(astNode as VarDeclaration, env);
                 case NodeType.FunctionDeclaration:
                     return Statements.EvalFunctionDeclaration(astNode as FunctionDeclaration, env);
+                case NodeType.ReturnDeclaration:
+                    return Statements.EvalReturnDeclaration(astNode as ReturnDeclaration, env);
 
                 // Handle unimplemented ast types as error
                 default:

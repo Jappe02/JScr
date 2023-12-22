@@ -1,7 +1,5 @@
 ﻿using JScr.Frontend;
 using JScr.Runtime;
-using static JScr.Runtime.Values;
-using Environment = JScr.Runtime.Environment;
 
 namespace JScr
 {

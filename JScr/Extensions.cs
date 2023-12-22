@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text.Json;
 
 namespace JScr
 {
@@ -40,6 +36,20 @@ namespace JScr
             list.RemoveAt(0);
 
             return firstElement;
+        }
+    }
+
+    internal static class ObjectExtensions
+    {
+        /// <summary>
+        /// Quickly serialize any Object to json when a json representation is needed.
+        /// Use json attributes for the Object's fields to exclude fields etc.
+        /// </summary>
+        /// <param name="obj"></param>
+        /// <returns></returns>
+        public static string ToJson(this object obj)
+        {
+            return JsonSerializer.Serialize(obj);
         }
     }
 }

@@ -18,18 +18,18 @@ namespace TestApp
             {
                 try
                 {
-                    _ = script.Script.Execute();
+                    var exec = script.Script.Execute(false);
+                    exec.Wait();
                 } catch (RuntimeException ex)
                 {
                     Console.WriteLine("> Code failed to execute due to runtime error: <");
                     Console.WriteLine($"\n  {ex}");
                     Console.WriteLine($"\n\n");
-                }
 
-                Console.WriteLine("Exiting with runtime error.");
-                Console.ReadLine();
-                Environment.Exit(1);
-                
+                    Console.WriteLine("Exiting with runtime error.");
+                    Console.ReadLine();
+                    Environment.Exit(1);
+                }
             } else
             {
                 Console.WriteLine("> Syntax errors found in code: <");

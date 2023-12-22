@@ -1,11 +1,4 @@
 ﻿using JScr.Frontend;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 using static JScr.Frontend.Ast;
 using static JScr.Runtime.Values;
 using ValueType = JScr.Runtime.Values.ValueType;
@@ -55,7 +48,7 @@ namespace JScr.Runtime.Eval
         public static RuntimeVal EvalAssignment(AssignmentExpr node, Environment env)
         {
             if (node.Assigne.Kind != NodeType.Identifier)
-                throw new RuntimeException($"Invalid LMS inside assignment expr: {JsonSerializer.Serialize(node.Assigne)}");
+                throw new RuntimeException($"Invalid LMS inside assignment expr: {node.Assigne.ToJson()}");
 
             var varname = (node.Assigne as Identifier).Symbol;
             return env.AssignVar(varname, Interpreter.Evaluate(node.Value, env));
@@ -102,13 +95,19 @@ namespace JScr.Runtime.Eval
                 // Evaluate the function body statement by statement.
                 foreach (var stmt in func.Body)
                 {
-                    result = Interpreter.Evaluate(stmt, scope);
+                    if (stmt is ReturnDeclaration)
+                    {
+                        result = Interpreter.Evaluate(stmt, scope);
+                        continue;
+                    }
+
+                    Interpreter.Evaluate(stmt, scope);
                 }
 
                 return result;
             }
 
-            throw new RuntimeException($"Cannot call value that is not a function: {JsonSerializer.Serialize(fn)}");
+            throw new RuntimeException($"Cannot call value that is not a function: {fn.ToJson()}");
         }
     }
 }

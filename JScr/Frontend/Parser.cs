@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static JScr.Frontend.Ast;
+﻿using static JScr.Frontend.Ast;
 using static JScr.Frontend.Lexer;
 
 namespace JScr.Frontend
@@ -14,6 +9,13 @@ namespace JScr.Frontend
         private List<uint[]> linesAndCols = new();
 
         private string filedir = "";
+
+        /// <summary>
+        /// Returns 0 if the current token is not between any type of equal sign or a semicolon,
+        /// or inside a function call.
+        /// Scope {} does not matter!
+        /// </summary>
+        private uint outline = 0;
 
         private bool NotEOF() => tokens[0].Type != TokenType.EOF;
         
@@ -45,6 +47,7 @@ namespace JScr.Frontend
             var tokenDictionary = Tokenize(filedir, sourceCode);
             tokens = tokenDictionary.Keys.ToList();
             linesAndCols = tokenDictionary.Values.ToList();
+            linesAndCols.Add(linesAndCols.Last()); // <-- Add duplicate of last item to prevent index out of range exception if syntax error on last token.
 
             var program = new Program(new List<Stmt>());
 
@@ -66,8 +69,10 @@ namespace JScr.Frontend
                 case TokenType.Let:
                 case TokenType.Const:
                     return ParseVarDeclaration();
-                case TokenType.Fn:
+                case TokenType.Func:
                     return ParseFnDeclaration();
+                case TokenType.Return:
+                    return ParseReturnStmt();
                 default:
                     return ParseExpr();
             }
@@ -76,7 +81,7 @@ namespace JScr.Frontend
         private Stmt ParseFnDeclaration()
         {
             Eat(); // eat the fn keyword
-            var name = Expect(TokenType.Identifier, "Expected function name following fn keyword.").Value;
+            var name = Expect(TokenType.Identifier, "Expected function name following func keyword.").Value;
             var args = ParseArgs();
             var params_ = new List<string>();
             foreach (var arg in args)
@@ -118,10 +123,24 @@ namespace JScr.Frontend
             }
 
             Expect(TokenType.Equals, "Expected equals token following identifier in var declaration.");
+            outline++;
             var declaration = new VarDeclaration(isConstant, identifier, ParseExpr());
             Expect(TokenType.Semicolon, "Variable declaration statement must end with semicolon.");
+            outline--;
 
             return declaration;
+        }
+
+        private Stmt ParseReturnStmt()
+        {
+            Eat();
+
+            outline++;
+            var val = new ReturnDeclaration(ParseExpr());
+            Expect(TokenType.Semicolon, "Return statement must end with semicolon.");
+            outline--;
+
+            return val;
         }
 
         private Expr ParseExpr()
@@ -228,7 +247,9 @@ namespace JScr.Frontend
 
         private Expr ParseCallExpr(Expr caller)
         {
-            Expr callExpr = new CallExpr(ParseArgs(), caller);
+            Expr callExpr = new CallExpr(ParseArgs(() => {
+                if (outline <= 1) Expect(TokenType.Semicolon, "Semicolon expected after outline call expression.");
+            }), caller);
 
             if (At().Type == TokenType.OpenParen)
             {
@@ -238,12 +259,17 @@ namespace JScr.Frontend
             return callExpr;
         }
 
-        private List<Expr> ParseArgs()
+        private List<Expr> ParseArgs(Action? preEnd = null)
         {
+            outline++;
+
             Expect(TokenType.OpenParen, "Expected open parenthesis.");
             var args = At().Type == TokenType.CloseParen ? new List<Expr>() : ParseArgumentsList();
 
             Expect(TokenType.CloseParen, "Expected closing parenthesis inside arguments list.");
+            preEnd?.Invoke();
+
+            outline--;
             return args;
         }
 

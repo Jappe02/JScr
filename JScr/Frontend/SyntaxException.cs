@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
+﻿using System.Text.Json;
 
 namespace JScr.Frontend
 {
@@ -15,6 +10,8 @@ namespace JScr.Frontend
         {
             Error = error;
         }
+
+        public string ToJson() => Error.ToJson();
     }
 
     public class SyntaxError
@@ -55,7 +52,6 @@ namespace JScr.Frontend
         public static SyntaxError Unknown(string filedir, uint line, uint col) => new(filedir, line, col, "Unknown syntax error!");
 
         public override string ToString() => $"Syntax error at: \"{Filedir}\" [{Line}:{Col}] ({ErrCode}) \"{Description}\"";
-        public string ToJson() => JsonSerializer.Serialize(this);
     }
 
     /*

@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
+﻿using System.Text.Json;
 
 namespace JScr.Frontend
 {
@@ -15,6 +10,7 @@ namespace JScr.Frontend
             Program,
             VarDeclaration,
             FunctionDeclaration,
+            ReturnDeclaration,
 
             // EXPRESSIONS
             AssignmentExpr,
@@ -31,27 +27,23 @@ namespace JScr.Frontend
 
         public abstract class Stmt
         {
-            public readonly NodeType Kind;
+            public NodeType Kind { get; }
 
             public Stmt(NodeType kind) { Kind = kind; }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class Program : Stmt
         {
-            public readonly List<Stmt> Body;
+            public List<Stmt> Body { get; }
 
             public Program(List<Stmt> body) : base(NodeType.Program) { Body = body; }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class VarDeclaration : Stmt
         {
-            public readonly bool Constant;
-            public readonly string Identifier;
-            public readonly Expr? Value;
+            public bool Constant { get; }
+            public string Identifier { get; }
+            public Expr? Value { get; }
 
             public VarDeclaration(bool constant, string identifier, Expr? value) : base(NodeType.VarDeclaration)
             {
@@ -59,15 +51,13 @@ namespace JScr.Frontend
                 Identifier = identifier;
                 Value = value;
             }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class FunctionDeclaration : Stmt
         {
-            public readonly string[] Parameters;
-            public readonly string Name;
-            public readonly Stmt[] Body;
+            public string[] Parameters { get; }
+            public string Name { get; }
+            public Stmt[] Body { get; }
 
             public FunctionDeclaration(string[] parameters, string name, Stmt[] body) : base(NodeType.FunctionDeclaration)
             {
@@ -77,33 +67,39 @@ namespace JScr.Frontend
                 // TODO: Important keywords like `async` etc.
             }
 
-            public override string ToString() => JsonSerializer.Serialize(this);
+        }
+
+        public class ReturnDeclaration : Stmt
+        {
+            public Expr Value { get; }
+
+            public ReturnDeclaration(Expr value) : base(NodeType.ReturnDeclaration)
+            {
+                Value = value;
+            }
         }
 
         public abstract class Expr : Stmt
         {
             public Expr(NodeType kind) : base(kind) { }
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class AssignmentExpr : Expr
         {
-            public readonly Expr Assigne;
-            public readonly Expr Value;
+            public Expr Assigne { get; }
+            public Expr Value { get; }
 
             public AssignmentExpr(Expr assigne, Expr value) : base(NodeType.AssignmentExpr) {
                 Assigne = assigne;
                 Value = value;
             }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class BinaryExpr : Expr
         {
-            public readonly Expr Left;
-            public readonly Expr Right;
-            public readonly string Operator;
+            public Expr Left { get; }
+            public Expr Right { get; }
+            public string Operator { get; }
 
             public BinaryExpr(Expr left, Expr right, string operator_) : base(NodeType.BinaryExpr)
             {
@@ -111,29 +107,25 @@ namespace JScr.Frontend
                 Right = right;
                 Operator = operator_;
             }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class CallExpr : Expr
         {
-            public readonly List<Expr> Args;
-            public readonly Expr Caller;
+            public List<Expr> Args { get; }
+            public Expr Caller { get; }
 
             public CallExpr(List<Expr> args, Expr calle) : base(NodeType.CallExpr)
             {
                 Caller = calle;
                 Args = args;
             }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class MemberExpr : Expr
         {
-            public readonly Expr Object;
-            public readonly Expr Property;
-            public readonly bool Computed;
+            public Expr Object { get; }
+            public Expr Property { get; }
+            public bool Computed { get; }
 
             public MemberExpr(Expr object_, Expr property, bool computed) : base(NodeType.MemberExpr)
             {
@@ -141,48 +133,38 @@ namespace JScr.Frontend
                 Property = property;
                 Computed = computed;
             }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class Identifier : Expr
         {
-            public readonly string Symbol;
+            public string Symbol { get; }
 
             public Identifier(string symbol) : base(NodeType.Identifier) { Symbol = symbol; }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class NumericLiteral : Expr
         {
-            public readonly float Value;
+            public float Value { get; }
 
             public NumericLiteral(float value) : base(NodeType.NumericLiteral) { Value = value; }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class Property : Expr
         {
-            public readonly string Key;
-            public readonly Expr? Value;
+            public string Key { get; }
+            public Expr? Value { get; }
 
             public Property(string key, Expr? value) : base(NodeType.Property) {
                 Key = key;
                 Value = value;
             }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         public class ObjectLiteral : Expr
         {
-            public readonly Property[] Properties;
+            public Property[] Properties { get; }
 
             public ObjectLiteral(Property[] properties) : base(NodeType.ObjectLiteral) { Properties = properties; }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
     }
 }

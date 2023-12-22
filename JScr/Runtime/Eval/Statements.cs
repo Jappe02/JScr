@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static JScr.Frontend.Ast;
+﻿using static JScr.Frontend.Ast;
 using static JScr.Runtime.Values;
 
 namespace JScr.Runtime.Eval
@@ -33,6 +28,13 @@ namespace JScr.Runtime.Eval
             var fn = new FunctionVal(declaration.Name, declaration.Parameters, env, declaration.Body);
 
             return env.DeclareVar(declaration.Name, fn, true);
+        }
+
+        public static RuntimeVal EvalReturnDeclaration(ReturnDeclaration declaration, Environment env)
+        {
+            var value = declaration.Value != null ? Interpreter.Evaluate(declaration.Value, env) : new NullVal();
+
+            return value;
         }
     }
 }

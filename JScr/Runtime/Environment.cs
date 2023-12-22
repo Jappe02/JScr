@@ -1,10 +1,6 @@
 ﻿using JScr.Frontend;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
+using System.Text.Json.Serialization;
 using static JScr.Runtime.Values;
 
 namespace JScr.Runtime
@@ -24,7 +20,7 @@ namespace JScr.Runtime
             env.DeclareVar("print", new NativeFnVal((args, scope) =>
             {
                 // TODO
-                Console.WriteLine(args);
+                Console.WriteLine(string.Join(' ', args.AsEnumerable()));
                 return new NullVal();
             }), true);
 
@@ -90,8 +86,6 @@ namespace JScr.Runtime
 
             return parent.Resolve(varname);
         }
-
-        public override string ToString() => JsonSerializer.Serialize(this);
         #endregion
     }
 }

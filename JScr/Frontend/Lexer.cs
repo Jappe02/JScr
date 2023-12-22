@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
+﻿using System.Text.Json;
 
 namespace JScr.Frontend
 {
@@ -16,7 +11,7 @@ namespace JScr.Frontend
             Identifier,
 
             // Keywords
-            Let, Const, Fn,
+            Let, Const, Func, Return,
 
             // Gruping * Operators
             BinaryOperator,
@@ -32,7 +27,8 @@ namespace JScr.Frontend
         static readonly Dictionary<string, TokenType> KEYWORDS = new() {
             { "let", TokenType.Let},
             { "const", TokenType.Const},
-            { "fn", TokenType.Fn},
+            { "func", TokenType.Func},
+            { "return", TokenType.Return},
         };
 
         public class Token
@@ -51,8 +47,6 @@ namespace JScr.Frontend
                 Value = value.ToString();
                 Type = type;
             }
-
-            public override string ToString() => JsonSerializer.Serialize(this);
         }
 
         static bool IsAlpha(char src) => src.ToString().ToUpper() != src.ToString().ToLower();
@@ -159,7 +153,7 @@ namespace JScr.Frontend
                         if (KEYWORDS.TryGetValue(ident, out var keywordType)) reserved = keywordType;
                         else reserved = null;
 
-                        if (reserved is TokenType.Number)
+                        if (reserved != 0 && reserved != null)
                         {
                             Push(new Token(ident, (TokenType)reserved));
                         } else
