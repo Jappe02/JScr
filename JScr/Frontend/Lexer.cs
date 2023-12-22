@@ -68,6 +68,9 @@ namespace JScr.Frontend
             uint line = 1;
             uint col = 0;
 
+            bool insideComment = false;
+            bool insideCommentMultiline = false;
+
             char Shift()
             {
                 col++;
@@ -76,8 +79,45 @@ namespace JScr.Frontend
 
             void Push(Token token)
             {
+                if (insideComment) return;
+
                 tokens!.Add(token, new uint[] { line, col });
-            } 
+            }
+
+            // Will return true if this is the beginning or the end of a comment.
+            // Shifts twice before returning true to get rid of comment beginning and end parts.
+            bool CommentModifier()
+            {
+                if (src.Count < 2) return false;
+
+                if (src[0] == '/')
+                {
+                    if (src[1] == '/') // "//"
+                    {
+                        insideComment = true;
+                        insideCommentMultiline = false;
+                        Shift(); Shift();
+                        return true;
+                    } else if (src[1] == '*') // "/*"
+                    {
+                        insideComment = true;
+                        insideCommentMultiline = true;
+                        Shift(); Shift();
+                        return true;
+                    }
+                } else if (src[0] == '*')
+                {
+                    if (src[1] == '/') // "*/"
+                    {
+                        insideComment = false;
+                        insideCommentMultiline = false;
+                        Shift(); Shift();
+                        return true;
+                    }
+                }
+
+                return false;
+            }
 
             // Build each token until end of file.
             while (src.Count > 0)
@@ -103,10 +143,11 @@ namespace JScr.Frontend
                     Push(new Token(Shift(), TokenType.CloseBracket));
                 }
 
-                // HANDLE BINARY OPERATORS
+                // HANDLE BINARY OPERATORS & COMMENTS
                 else if (src[0] == '+' || src[0] == '-' || src[0] == '*' || src[0] == '/' || src[0] == '%')
                 {
-                    Push(new Token(Shift(), TokenType.BinaryOperator));
+                    if (!CommentModifier())
+                        Push(new Token(Shift(), TokenType.BinaryOperator));
                 }
 
                 // HANDLE CONDITIONAL & ASSIGNMENT TOKENS
@@ -162,7 +203,13 @@ namespace JScr.Frontend
                         }
                     } else if (IsSkippable(src[0]))
                     {
-                        if (src[0] == '\n') { line++; col = 0; }
+                        if (src[0] == '\n') {
+                            line++; col = 0;
+
+                            if (insideComment && !insideCommentMultiline)
+                                insideComment = false;
+                        }
+
                         Shift(); // SKIP THE CURRENT CHARACTER
                     } else
                     {
