@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using static JScr.Runtime.Values;
 
 namespace JScr.Frontend
 {
@@ -42,12 +43,14 @@ namespace JScr.Frontend
         public class VarDeclaration : Stmt
         {
             public bool Constant { get; }
+            public Type Type { get; }
             public string Identifier { get; }
             public Expr? Value { get; }
 
-            public VarDeclaration(bool constant, string identifier, Expr? value) : base(NodeType.VarDeclaration)
+            public VarDeclaration(bool constant, Type type, string identifier, Expr? value) : base(NodeType.VarDeclaration)
             {
                 Constant = constant;
+                Type = type;
                 Identifier = identifier;
                 Value = value;
             }
@@ -55,18 +58,19 @@ namespace JScr.Frontend
 
         public class FunctionDeclaration : Stmt
         {
-            public string[] Parameters { get; }
+            public VarDeclaration[] Parameters { get; }
             public string Name { get; }
+            public Type Type { get; }
             public Stmt[] Body { get; }
 
-            public FunctionDeclaration(string[] parameters, string name, Stmt[] body) : base(NodeType.FunctionDeclaration)
+            public FunctionDeclaration(VarDeclaration[] parameters, string name, Type type, Stmt[] body) : base(NodeType.FunctionDeclaration)
             {
                 Parameters = parameters;
                 Name = name;
+                Type = type;
                 Body = body;
                 // TODO: Important keywords like `async` etc.
             }
-
         }
 
         public class ReturnDeclaration : Stmt
@@ -144,9 +148,9 @@ namespace JScr.Frontend
 
         public class NumericLiteral : Expr
         {
-            public float Value { get; }
+            public int Value { get; }
 
-            public NumericLiteral(float value) : base(NodeType.NumericLiteral) { Value = value; }
+            public NumericLiteral(int value) : base(NodeType.NumericLiteral) { Value = value; }
         }
 
         public class Property : Expr

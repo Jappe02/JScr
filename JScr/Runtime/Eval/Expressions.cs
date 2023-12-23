@@ -7,9 +7,9 @@ namespace JScr.Runtime.Eval
 {
     internal static class Expressions
     {
-        private static NumberVal EvalNumericBinaryExpr(NumberVal lhs, NumberVal rhs, string operator_)
+        private static IntegerType EvalNumericBinaryExpr(IntegerType lhs, IntegerType rhs, string operator_)
         {
-            var result = 0f;
+            var result = 0;
             if (operator_ == "+")
                 result = lhs.Value + rhs.Value;
             else if (operator_ == "-")
@@ -22,7 +22,7 @@ namespace JScr.Runtime.Eval
             else
                 result = lhs.Value % rhs.Value;
 
-            return new NumberVal(result);
+            return new IntegerType(result);
         }
 
         public static RuntimeVal EvalBinaryExpr(BinaryExpr binop, Environment env)
@@ -30,9 +30,10 @@ namespace JScr.Runtime.Eval
             var lhs = Interpreter.Evaluate(binop.Left, env);
             var rhs = Interpreter.Evaluate(binop.Right, env);
 
-            if (lhs.Type == ValueType.number && rhs.Type == ValueType.number)
+            if (lhs.Type == ValueType.runtimeType && rhs.Type == ValueType.runtimeType)
             {
-                return EvalNumericBinaryExpr(lhs as NumberVal, rhs as NumberVal, binop.Operator);
+                if (lhs is IntegerType && rhs is IntegerType)
+                    return EvalNumericBinaryExpr(lhs as IntegerType, rhs as IntegerType, binop.Operator);
             }
 
             // One or both are NULL
@@ -87,8 +88,32 @@ namespace JScr.Runtime.Eval
                 {
                     // TODO: Check the bounce here
                     // verify arity of function
-                    var varname = func.Parameters[i];
-                    scope.DeclareVar(varname, args[i], false);
+                    var variable = func.Parameters[i];
+
+
+
+
+
+
+                    var constructorArgs = new object[]{ args[i] };
+
+                    // Get the constructor that matches the specified parameter types
+                    var constructor = variable.Type.GetConstructor(constructorArgs.Select(obj => obj.GetType()).ToArray());
+
+                    if (constructor == null || !RuntimeType.ReservedTypeIsValid(variable.Type))
+                        throw new RuntimeException("Parameter type is invalid! It does not seem to derive from \"RuntimeType<T>\".");
+
+
+                    // Create an instance of the type with the provided constructor arguments
+                    RuntimeVal instance = Activator.CreateInstance(variable.Type, args: constructorArgs) as RuntimeVal;
+
+
+
+
+
+
+
+                    scope.DeclareVar(variable.Identifier, instance ?? new NullVal(), false, variable.Type);
                 }
 
                 var result = new NullVal() as RuntimeVal;

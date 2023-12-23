@@ -1,5 +1,6 @@
 ﻿using static JScr.Frontend.Ast;
 using static JScr.Frontend.Lexer;
+using static JScr.Runtime.Values;
 
 namespace JScr.Frontend
 {
@@ -66,11 +67,9 @@ namespace JScr.Frontend
         {
             switch (At().Type)
             {
-                case TokenType.Let:
                 case TokenType.Const:
-                    return ParseVarDeclaration();
-                case TokenType.Func:
-                    return ParseFnDeclaration();
+                case TokenType.Type:
+                    return ParseType(); // <-- TODO
                 case TokenType.Return:
                     return ParseReturnStmt();
                 default:
@@ -78,20 +77,49 @@ namespace JScr.Frontend
             }
         }
 
-        private Stmt ParseFnDeclaration()
+        private Stmt ParseType()
         {
-            Eat(); // eat the fn keyword
-            var name = Expect(TokenType.Identifier, "Expected function name following func keyword.").Value;
-            var args = ParseArgs();
-            var params_ = new List<string>();
+            Token? type = null;
+            bool constant = false;
+
+            while (At().Type == TokenType.Type || At().Type == TokenType.Const)
+            {
+                if (At().Type == TokenType.Const && !constant)
+                {
+                    constant = true;
+                    Eat();
+                } else if (At().Type == TokenType.Type && type == null)
+                {
+                    type = Eat();
+                }
+            }
+
+            if (type == null)
+                ThrowSyntaxError("No declaration type specified.");
+
+            var identifier = Expect(TokenType.Identifier, "Expected identifier after type.");
+
+            // Function
+            if (At().Type == TokenType.OpenParen)
+            {
+                if (constant) ThrowSyntaxError("Functions cannot be declared constant.");
+                return ParseFnDeclaration(type!, identifier);
+            }
+
+            return ParseVarDeclaration(type!, identifier, constant);
+        }
+
+        private Stmt ParseFnDeclaration(Token type, Token name)
+        {
+            //Eat(); // eat the fn keyword
+            //var name = Expect(TokenType.Identifier, "Expected function name following func keyword.").Value;
+            var args = ParseDeclarativeArgs();
             foreach (var arg in args)
             {
-                if (arg.Kind != NodeType.Identifier)
+                if (arg.Kind != NodeType.VarDeclaration)
                 {
-                    ThrowSyntaxError("Inside function declaration expected parameters to be of type string.");
+                    ThrowSyntaxError("Inside function declaration expected parameters to be variable declarations.");
                 }
-
-                params_.Add((arg as Identifier).Symbol);
             }
 
             Expect(TokenType.OpenBrace, "Expected function body following declaration.");
@@ -103,28 +131,60 @@ namespace JScr.Frontend
             }
 
             Expect(TokenType.CloseBrace, "Closing brace expected inside function declaration.");
-            var fn = new FunctionDeclaration(params_.ToArray(), name, body.ToArray());
+            var fn = new FunctionDeclaration(args.ToArray() as VarDeclaration[], name.Value, RuntimeType.ReservedTypeStringToType(type.Value), body.ToArray());
 
             return fn;
         }
 
-        private Stmt ParseVarDeclaration()
+        private List<Stmt> ParseDeclarativeArgs()
         {
-            var isConstant = Eat().Type == TokenType.Const;
-            var identifier = Expect(TokenType.Identifier, "Expected identifier name following let | const keywords.").Value;
+            outline++;
+
+            Expect(TokenType.OpenParen, "Expected open parenthesis.");
+            var args = At().Type == TokenType.CloseParen ? new List<Stmt>() : ParseDeclarativeArgsList();
+            Expect(TokenType.CloseParen, "Expected closing parenthesis inside arguments list.");
+
+            outline--;
+            return args;
+        }
+
+        private List<Stmt> ParseDeclarativeArgsList()
+        {
+            VarDeclaration ParseCustomParameterVDecl()
+            {
+                var type = Expect(TokenType.Type, "Type expected inside declarative arguments list.");
+                var ident = Expect(TokenType.Identifier, "Identifier expected after type inside declarative arguments list.");
+
+                return new VarDeclaration(false, RuntimeType.ReservedTypeStringToType(type.Value), ident.Value, null);
+            }
+
+            var args = new List<Stmt>(){ ParseCustomParameterVDecl() };
+
+            while (At().Type == TokenType.Comma && Eat() != null)
+            {
+                args.Add(ParseCustomParameterVDecl());
+            }
+
+            return args;
+        }
+
+        private Stmt ParseVarDeclaration(Token type, Token name, bool constant)
+        {
+            //var isConstant = Eat().Type == TokenType.Const;
+            //var identifier = Expect(TokenType.Identifier, "Expected identifier name following let | const keywords.").Value;
 
             if (At().Type == TokenType.Semicolon)
             {
                 Eat(); // expect semicolon
-                if (isConstant)
+                if (constant)
                     ThrowSyntaxError("Must assign value to constant expression. No value provided.");
 
-                return new VarDeclaration(false, identifier, null);
+                return new VarDeclaration(false, RuntimeType.ReservedTypeStringToType(type.Value), name.Value, null);
             }
 
             Expect(TokenType.Equals, "Expected equals token following identifier in var declaration.");
             outline++;
-            var declaration = new VarDeclaration(isConstant, identifier, ParseExpr());
+            var declaration = new VarDeclaration(constant, RuntimeType.ReservedTypeStringToType(type.Value), name.Value, ParseExpr());
             Expect(TokenType.Semicolon, "Variable declaration statement must end with semicolon.");
             outline--;
 
@@ -259,6 +319,8 @@ namespace JScr.Frontend
             return callExpr;
         }
 
+        /// <param name="preEnd">Make something execute after the closing paren.</param>
+        /// <returns>The args.</returns>
         private List<Expr> ParseArgs(Action? preEnd = null)
         {
             outline++;
@@ -328,7 +390,7 @@ namespace JScr.Frontend
                 case TokenType.Identifier:
                     return new Identifier(Eat().Value);
                 case TokenType.Number:
-                    return new NumericLiteral(float.Parse(Eat().Value));
+                    return new NumericLiteral(int.Parse(Eat().Value));
                 case TokenType.OpenParen:
                     Eat();
                     var value = ParseExpr();

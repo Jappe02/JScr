@@ -19,7 +19,7 @@ namespace JScr.Runtime
         {
             switch (astNode.Kind) {
                 case NodeType.NumericLiteral:
-                    return new NumberVal((astNode as NumericLiteral).Value) as RuntimeVal;
+                    return new IntegerType((astNode as NumericLiteral).Value) as RuntimeVal;
                 case NodeType.Identifier:
                     return Expressions.EvalIdentifier(astNode as Identifier, env);
                 case NodeType.ObjectLiteral:

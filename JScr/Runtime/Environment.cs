@@ -12,8 +12,8 @@ namespace JScr.Runtime
         {
             var env = new Environment(null);
             // Setup default environment
-            env.DeclareVar("true", new BoolVal(true), true);
-            env.DeclareVar("false", new BoolVal(false), true);
+            env.DeclareVar("true", new BoolType(true), true, typeof(BoolType));
+            env.DeclareVar("false", new BoolType(false), true, typeof(BoolType));
             env.DeclareVar("null", new NullVal(), true);
 
             // Define a native builtin method
@@ -22,7 +22,7 @@ namespace JScr.Runtime
                 // TODO
                 Console.WriteLine(string.Join(' ', args.AsEnumerable()));
                 return new NullVal();
-            }), true);
+            }), true, typeof(VoidType));
 
             return env;
         }
@@ -31,6 +31,7 @@ namespace JScr.Runtime
         #region env
         private readonly Environment? parent;
         private readonly Dictionary<string, RuntimeVal> variables;
+        private readonly List<Type> types;
         private readonly HashSet<string> constants;
 
         public Environment(Environment? parentEnv)
@@ -38,10 +39,11 @@ namespace JScr.Runtime
             var global = parentEnv != null;
             parent = parentEnv;
             variables = new Dictionary<string, RuntimeVal>();
+            types = new List<Type>();
             constants = new HashSet<string>();
         }
 
-        public RuntimeVal DeclareVar(string varname, RuntimeVal value, bool constant)
+        public RuntimeVal DeclareVar(string varname, RuntimeVal value, bool constant, Type type)
         {
             if (variables.ContainsKey(varname))
             {
@@ -49,6 +51,7 @@ namespace JScr.Runtime
             }
 
             variables.Add(varname, value);
+            types.Add(type);
             if (constant)
             {
                 constants.Add(varname);

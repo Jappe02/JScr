@@ -20,14 +20,14 @@ namespace JScr.Runtime.Eval
         public static RuntimeVal EvalVarDeclaration(VarDeclaration declaration, Environment env)
         {
             var value = declaration.Value != null ? Interpreter.Evaluate(declaration.Value, env) : new NullVal();
-            return env.DeclareVar(declaration.Identifier, value, declaration.Constant);
+            return env.DeclareVar(declaration.Identifier, value, declaration.Constant, declaration.Type);
         }
 
         public static RuntimeVal EvalFunctionDeclaration(FunctionDeclaration declaration, Environment env)
         {
-            var fn = new FunctionVal(declaration.Name, declaration.Parameters, env, declaration.Body);
+            var fn = new FunctionVal(declaration.Name, declaration.Type, declaration.Parameters, env, declaration.Body);
 
-            return env.DeclareVar(declaration.Name, fn, true);
+            return env.DeclareVar(declaration.Name, fn, true, declaration.Type);
         }
 
         public static RuntimeVal EvalReturnDeclaration(ReturnDeclaration declaration, Environment env)

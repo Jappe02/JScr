@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using static JScr.Runtime.Values;
 
 namespace JScr.Frontend
 {
@@ -6,12 +7,14 @@ namespace JScr.Frontend
     {
         public enum TokenType
         {
+            Type,
+
             // Literal Types
             Number,
             Identifier,
 
             // Keywords
-            Let, Const, Func, Return,
+            Const, Return,
 
             // Gruping * Operators
             BinaryOperator,
@@ -25,9 +28,7 @@ namespace JScr.Frontend
         }
 
         static readonly Dictionary<string, TokenType> KEYWORDS = new() {
-            { "let", TokenType.Let},
             { "const", TokenType.Const},
-            { "func", TokenType.Func},
             { "return", TokenType.Return},
         };
 
@@ -190,11 +191,11 @@ namespace JScr.Frontend
                         }
 
                         // check for reserved keywords
-                        TokenType? reserved;
+                        TokenType? reserved = null;
                         if (KEYWORDS.TryGetValue(ident, out var keywordType)) reserved = keywordType;
-                        else reserved = null;
+                        else if (RuntimeType.reservedTypesStrs.Contains(ident)) reserved = TokenType.Type;
 
-                        if (reserved != 0 && reserved != null)
+                        if (reserved != null)
                         {
                             Push(new Token(ident, (TokenType)reserved));
                         } else
