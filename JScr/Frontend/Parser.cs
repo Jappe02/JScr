@@ -1,5 +1,7 @@
-﻿using static JScr.Frontend.Ast;
+﻿using JScr.Runtime;
+using static JScr.Frontend.Ast;
 using static JScr.Frontend.Lexer;
+using static JScr.Runtime.Types;
 using static JScr.Runtime.Values;
 
 namespace JScr.Frontend
@@ -131,34 +133,34 @@ namespace JScr.Frontend
             }
 
             Expect(TokenType.CloseBrace, "Closing brace expected inside function declaration.");
-            var fn = new FunctionDeclaration(args.ToArray() as VarDeclaration[], name.Value, RuntimeType.ReservedTypeStringToType(type.Value), body.ToArray());
+            var fn = new FunctionDeclaration(args.ToArray(), name.Value, Types.FromString(type.Value), body.ToArray());
 
             return fn;
         }
 
-        private List<Stmt> ParseDeclarativeArgs()
+        private List<VarDeclaration> ParseDeclarativeArgs()
         {
             outline++;
 
             Expect(TokenType.OpenParen, "Expected open parenthesis.");
-            var args = At().Type == TokenType.CloseParen ? new List<Stmt>() : ParseDeclarativeArgsList();
+            var args = At().Type == TokenType.CloseParen ? new List<VarDeclaration>() : ParseDeclarativeArgsList();
             Expect(TokenType.CloseParen, "Expected closing parenthesis inside arguments list.");
 
             outline--;
             return args;
         }
 
-        private List<Stmt> ParseDeclarativeArgsList()
+        private List<VarDeclaration> ParseDeclarativeArgsList()
         {
             VarDeclaration ParseCustomParameterVDecl()
             {
                 var type = Expect(TokenType.Type, "Type expected inside declarative arguments list.");
                 var ident = Expect(TokenType.Identifier, "Identifier expected after type inside declarative arguments list.");
 
-                return new VarDeclaration(false, RuntimeType.ReservedTypeStringToType(type.Value), ident.Value, null);
+                return new VarDeclaration(false, Types.FromString(type.Value), ident.Value, null);
             }
 
-            var args = new List<Stmt>(){ ParseCustomParameterVDecl() };
+            var args = new List<VarDeclaration>(){ ParseCustomParameterVDecl() };
 
             while (At().Type == TokenType.Comma && Eat() != null)
             {
@@ -179,12 +181,12 @@ namespace JScr.Frontend
                 if (constant)
                     ThrowSyntaxError("Must assign value to constant expression. No value provided.");
 
-                return new VarDeclaration(false, RuntimeType.ReservedTypeStringToType(type.Value), name.Value, null);
+                return new VarDeclaration(false, Types.FromString(type.Value), name.Value, null);
             }
 
             Expect(TokenType.Equals, "Expected equals token following identifier in var declaration.");
             outline++;
-            var declaration = new VarDeclaration(constant, RuntimeType.ReservedTypeStringToType(type.Value), name.Value, ParseExpr());
+            var declaration = new VarDeclaration(constant, Types.FromString(type.Value), name.Value, ParseExpr());
             Expect(TokenType.Semicolon, "Variable declaration statement must end with semicolon.");
             outline--;
 

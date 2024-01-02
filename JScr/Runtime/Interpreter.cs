@@ -19,7 +19,7 @@ namespace JScr.Runtime
         {
             switch (astNode.Kind) {
                 case NodeType.NumericLiteral:
-                    return new IntegerType((astNode as NumericLiteral).Value) as RuntimeVal;
+                    return new IntegerVal((astNode as NumericLiteral).Value) as RuntimeVal;
                 case NodeType.Identifier:
                     return Expressions.EvalIdentifier(astNode as Identifier, env);
                 case NodeType.ObjectLiteral:
@@ -43,7 +43,7 @@ namespace JScr.Runtime
 
                 // Handle unimplemented ast types as error
                 default:
-                    throw new RuntimeException($"This AST Node has not yet been setup for interpretation: {astNode}"); // <-- TODO runtime error
+                    throw new RuntimeException($"This AST Node has not yet been setup for interpretation: {astNode}");
             }
         }
     }

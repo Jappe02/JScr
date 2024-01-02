@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using System.Linq;
+using System.Text.Json;
+using static JScr.Runtime.Types;
 using static JScr.Runtime.Values;
 
 namespace JScr.Frontend
@@ -193,7 +195,7 @@ namespace JScr.Frontend
                         // check for reserved keywords
                         TokenType? reserved = null;
                         if (KEYWORDS.TryGetValue(ident, out var keywordType)) reserved = keywordType;
-                        else if (RuntimeType.reservedTypesStrs.Contains(ident)) reserved = TokenType.Type;
+                        else if (reservedTypesDict.Values.Contains(ident)) reserved = TokenType.Type;
 
                         if (reserved != null)
                         {

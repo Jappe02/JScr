@@ -1,6 +1,7 @@
 ﻿using JScr.Frontend;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using static JScr.Runtime.Types;
 using static JScr.Runtime.Values;
 
 namespace JScr.Runtime
@@ -12,17 +13,17 @@ namespace JScr.Runtime
         {
             var env = new Environment(null);
             // Setup default environment
-            env.DeclareVar("true", new BoolType(true), true, typeof(BoolType));
-            env.DeclareVar("false", new BoolType(false), true, typeof(BoolType));
-            env.DeclareVar("null", new NullVal(), true);
+            env.DeclareVar("true", new BoolVal(true), true, Types.Type.Bool);
+            env.DeclareVar("false", new BoolVal(false), true, Types.Type.Bool);
+            env.DeclareVar("null", new NullVal(), true, Types.Type.Dynamic);
 
             // Define a native builtin method
-            env.DeclareVar("print", new NativeFnVal((args, scope) =>
+            env.DeclareVar("print", new NativeFnVal(Types.Type.Void, (args, scope) =>
             {
                 // TODO
                 Console.WriteLine(string.Join(' ', args.AsEnumerable()));
                 return new NullVal();
-            }), true, typeof(VoidType));
+            }), true, Types.Type.Void);
 
             return env;
         }
@@ -31,7 +32,7 @@ namespace JScr.Runtime
         #region env
         private readonly Environment? parent;
         private readonly Dictionary<string, RuntimeVal> variables;
-        private readonly List<Type> types;
+        private readonly Dictionary<string, Types.Type> types;
         private readonly HashSet<string> constants;
 
         public Environment(Environment? parentEnv)
@@ -39,19 +40,24 @@ namespace JScr.Runtime
             var global = parentEnv != null;
             parent = parentEnv;
             variables = new Dictionary<string, RuntimeVal>();
-            types = new List<Type>();
+            types = new Dictionary<string, Types.Type>();
             constants = new HashSet<string>();
         }
 
-        public RuntimeVal DeclareVar(string varname, RuntimeVal value, bool constant, Type type)
+        public RuntimeVal DeclareVar(string varname, RuntimeVal value, bool constant, Types.Type type)
         {
             if (variables.ContainsKey(varname))
             {
                 throw new RuntimeException($"Cannot declare variable \"{varname}\". As it already is defined.");
             }
 
+            if (!Types.RuntimeValMatchesType(type, value))
+            {
+                throw new RuntimeException($"Cannot declare variable \"{varname}\". Type and initial value do not match.");
+            }
+
             variables.Add(varname, value);
-            types.Add(type);
+            types.Add(varname, type);
             if (constant)
             {
                 constants.Add(varname);
@@ -62,11 +68,17 @@ namespace JScr.Runtime
         public RuntimeVal AssignVar(string varname, RuntimeVal value)
         {
             var env = Resolve(varname);
+            var type = env.types[varname];
             
             // Cannot assign to constant
             if (env.constants.Contains(varname))
             {
                 throw new RuntimeException($"Cannot resign to variable \"{varname}\" as it was declared constant.");
+            }
+
+            if (!Types.RuntimeValMatchesType(type, value))
+            {
+                throw new RuntimeException($"Cannot resign to variable \"{varname}\". Type and new value do not match.");
             }
 
             env.variables.Add(varname, value);

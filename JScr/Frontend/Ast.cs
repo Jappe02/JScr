@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using JScr.Runtime;
+using System.Text.Json;
 using static JScr.Runtime.Values;
 
 namespace JScr.Frontend
@@ -43,14 +44,14 @@ namespace JScr.Frontend
         public class VarDeclaration : Stmt
         {
             public bool Constant { get; }
-            public Type Type { get; }
+            public Types.Type Type { get; }
             public string Identifier { get; }
             public Expr? Value { get; }
 
-            public VarDeclaration(bool constant, Type type, string identifier, Expr? value) : base(NodeType.VarDeclaration)
+            public VarDeclaration(bool constant, Types.Type? type, string identifier, Expr? value) : base(NodeType.VarDeclaration)
             {
                 Constant = constant;
-                Type = type;
+                Type = type ?? Types.Type.Void;
                 Identifier = identifier;
                 Value = value;
             }
@@ -60,14 +61,14 @@ namespace JScr.Frontend
         {
             public VarDeclaration[] Parameters { get; }
             public string Name { get; }
-            public Type Type { get; }
+            public Types.Type Type { get; }
             public Stmt[] Body { get; }
 
-            public FunctionDeclaration(VarDeclaration[] parameters, string name, Type type, Stmt[] body) : base(NodeType.FunctionDeclaration)
+            public FunctionDeclaration(VarDeclaration[] parameters, string name, Types.Type? type, Stmt[] body) : base(NodeType.FunctionDeclaration)
             {
                 Parameters = parameters;
                 Name = name;
-                Type = type;
+                Type = type ?? Types.Type.Void;
                 Body = body;
                 // TODO: Important keywords like `async` etc.
             }

@@ -7,7 +7,7 @@ namespace JScr.Runtime.Eval
 {
     internal static class Expressions
     {
-        private static IntegerType EvalNumericBinaryExpr(IntegerType lhs, IntegerType rhs, string operator_)
+        private static IntegerVal EvalNumericBinaryExpr(IntegerVal lhs, IntegerVal rhs, string operator_)
         {
             var result = 0;
             if (operator_ == "+")
@@ -22,7 +22,7 @@ namespace JScr.Runtime.Eval
             else
                 result = lhs.Value % rhs.Value;
 
-            return new IntegerType(result);
+            return new IntegerVal(result);
         }
 
         public static RuntimeVal EvalBinaryExpr(BinaryExpr binop, Environment env)
@@ -30,10 +30,9 @@ namespace JScr.Runtime.Eval
             var lhs = Interpreter.Evaluate(binop.Left, env);
             var rhs = Interpreter.Evaluate(binop.Right, env);
 
-            if (lhs.Type == ValueType.runtimeType && rhs.Type == ValueType.runtimeType)
+            if (lhs.Type == ValueType.integer && rhs.Type == ValueType.integer)
             {
-                if (lhs is IntegerType && rhs is IntegerType)
-                    return EvalNumericBinaryExpr(lhs as IntegerType, rhs as IntegerType, binop.Operator);
+                return EvalNumericBinaryExpr(lhs as IntegerVal, rhs as IntegerVal, binop.Operator);
             }
 
             // One or both are NULL
@@ -80,7 +79,7 @@ namespace JScr.Runtime.Eval
                 return result;
             } else if (fn.Type == ValueType.function)
             {
-                var func = fn as FunctionVal;
+                var func = fn as FunctionVal; // <-- target function to call
                 var scope = new Environment(func.DeclarationEnv);
 
                 // Create the variables for the parameters list
@@ -89,31 +88,16 @@ namespace JScr.Runtime.Eval
                     // TODO: Check the bounce here
                     // verify arity of function
                     var variable = func.Parameters[i];
+                    scope.DeclareVar(variable.Identifier, args[i], variable.Constant, variable.Type);
 
+                    /*
+                     * // TODO: Check the bounce here
+                    // verify arity of function
+                    var varname = func.Parameters[i];
+                    scope.DeclareVar(varname, args[i], false);
+                    */
 
-
-
-
-
-                    var constructorArgs = new object[]{ args[i] };
-
-                    // Get the constructor that matches the specified parameter types
-                    var constructor = variable.Type.GetConstructor(constructorArgs.Select(obj => obj.GetType()).ToArray());
-
-                    if (constructor == null || !RuntimeType.ReservedTypeIsValid(variable.Type))
-                        throw new RuntimeException("Parameter type is invalid! It does not seem to derive from \"RuntimeType<T>\".");
-
-
-                    // Create an instance of the type with the provided constructor arguments
-                    RuntimeVal instance = Activator.CreateInstance(variable.Type, args: constructorArgs) as RuntimeVal;
-
-
-
-
-
-
-
-                    scope.DeclareVar(variable.Identifier, instance ?? new NullVal(), false, variable.Type);
+                    //scope.DeclareVar(variable.Identifier, instance ?? new NullVal(), false, variable.Type);
                 }
 
                 var result = new NullVal() as RuntimeVal;
@@ -123,7 +107,7 @@ namespace JScr.Runtime.Eval
                     if (stmt is ReturnDeclaration)
                     {
                         result = Interpreter.Evaluate(stmt, scope);
-                        continue;
+                        break;
                     }
 
                     Interpreter.Evaluate(stmt, scope);
