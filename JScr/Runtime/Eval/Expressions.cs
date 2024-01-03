@@ -25,6 +25,15 @@ namespace JScr.Runtime.Eval
             return new IntegerVal(result);
         }
 
+        private static StringVal EvalStringBinaryExpr(StringVal lhs, StringVal rhs, string operator_)
+        {
+            var result = "";
+            if (operator_ == "+")
+                result = lhs.Value + rhs.Value;
+
+            return new StringVal(result);
+        }
+
         public static RuntimeVal EvalBinaryExpr(BinaryExpr binop, Environment env)
         {
             var lhs = Interpreter.Evaluate(binop.Left, env);
@@ -33,6 +42,9 @@ namespace JScr.Runtime.Eval
             if (lhs.Type == ValueType.integer && rhs.Type == ValueType.integer)
             {
                 return EvalNumericBinaryExpr(lhs as IntegerVal, rhs as IntegerVal, binop.Operator);
+            } else if (lhs.Type == ValueType.string_ && rhs.Type == ValueType.string_)
+            {
+                return EvalStringBinaryExpr(lhs as StringVal, rhs as StringVal, binop.Operator);
             }
 
             // One or both are NULL
@@ -57,15 +69,32 @@ namespace JScr.Runtime.Eval
         public static RuntimeVal EvalObjectExpr(ObjectLiteral obj, Environment env)
         {
             var object_ = new ObjectVal(new());
-            foreach (var kvp in obj.Properties)
+            foreach (var prop in obj.Properties)
             {
-                var key = kvp.Key;
-                var value = kvp.Value;
+                var key = prop.Key;
+                var type = prop.Type;
+                var value = prop.Value;
 
-                var runtimeVal = (value == null) ? env.LookupVar(key) : Interpreter.Evaluate(value, env);
-                object_.Properties[key] = runtimeVal;
+                var runtimeVal = (value == null) ? new NullVal() : Interpreter.Evaluate(value, env);
+                //object_.Properties[key] = runtimeVal;
+                object_.Properties.Add(new ObjectVal.Property(key, type, runtimeVal));
             }
             return object_;
+        }
+
+        public static RuntimeVal EvalMemberExpr(MemberExpr node, Environment env)
+        {
+            var obj = Interpreter.Evaluate(node.Object, env);
+
+            if (obj.Type != ValueType.object_)
+                throw new RuntimeException($"Member expressions can only be used for objects.");
+
+            var p = (obj as ObjectVal).Properties.FirstOrDefault((prop) => prop.Key == node.Property.Symbol);
+
+            if (p == null)
+                throw new RuntimeException($"Property does not exist in object.");
+
+            return p?.Value ?? new NullVal();
         }
 
         public static RuntimeVal EvalCallExpr(CallExpr expr, Environment env)

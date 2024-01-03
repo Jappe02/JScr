@@ -9,6 +9,7 @@ namespace JScr.Runtime
         {
             null_,
             integer,
+            string_,
             boolean,
             object_,
             function,
@@ -20,6 +21,11 @@ namespace JScr.Runtime
             public ValueType Type { get; }
 
             public RuntimeVal(ValueType type) { Type = type; }
+
+            public override string ToString()
+            {
+                return "RuntimeVal";
+            }
         }
 
         public class NullVal : RuntimeVal
@@ -49,11 +55,36 @@ namespace JScr.Runtime
             public override string ToString() => Value.ToString();
         }
 
+        public class StringVal : RuntimeVal
+        {
+            public string Value { get; }
+
+            public StringVal(string value = "") : base(ValueType.string_) { Value = value; }
+
+            public override string ToString() => Value.ToString();
+        }
+
         public class ObjectVal : RuntimeVal
         {
-            public Dictionary<string, RuntimeVal> Properties { get; }
+            public class Property
+            {
+                public string Key { get; }
+                public Types.Type Type { get; }
+                public RuntimeVal Value { get; }
 
-            public ObjectVal(Dictionary<string, RuntimeVal> properties) : base(ValueType.object_) { Properties = properties; }
+                public Property(string key, Types.Type? type, RuntimeVal value)
+                {
+                    Key = key;
+                    Type = type ?? Types.Type.Void;
+                    Value = value;
+                }
+
+                public override string ToString() => this.ToJson();
+            }
+
+            public List<Property> Properties { get; }
+
+            public ObjectVal(List<Property> properties) : base(ValueType.object_) { Properties = properties; }
 
             public override string ToString() => Properties.ToJson();
         }

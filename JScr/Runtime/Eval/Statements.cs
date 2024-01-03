@@ -1,5 +1,8 @@
-﻿using static JScr.Frontend.Ast;
+﻿using JScr.Frontend;
+using System;
+using static JScr.Frontend.Ast;
 using static JScr.Runtime.Values;
+using static JScr.Script;
 
 namespace JScr.Runtime.Eval
 {
@@ -35,6 +38,41 @@ namespace JScr.Runtime.Eval
             var value = declaration.Value != null ? Interpreter.Evaluate(declaration.Value, env) : new NullVal();
 
             return value;
+        }
+
+        public static RuntimeVal EvalIfElseDeclaration(IfElseDeclaration declaration, Environment env)
+        {
+            foreach (var block in declaration.Blocks) {
+                var val = Interpreter.Evaluate(block.Condition, env);
+
+                // Verify valid bool
+                if (val.Type != Values.ValueType.boolean)
+                    throw new RuntimeException("If statement condition needs to be a boolean.");
+
+                // Continue to next iteration if the value is false
+                if (!(val as BoolVal).Value) continue;
+
+                // If the value is true, execute statement body and return
+                var scope = new Environment(env);
+                foreach (var stmt in block.Body)
+                {
+                    Interpreter.Evaluate(stmt, scope);
+                }
+
+                return new NullVal();
+            }
+
+            // Execute else statement if there is one
+            if (declaration.ElseBody != null)
+            {
+                var scope = new Environment(env);
+                foreach (var stmt in declaration.ElseBody)
+                {
+                    Interpreter.Evaluate(stmt, scope);
+                }
+            }
+
+            return new NullVal();
         }
     }
 }

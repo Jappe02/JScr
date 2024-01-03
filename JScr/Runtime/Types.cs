@@ -62,7 +62,7 @@ namespace JScr.Runtime
         #endregion
         */
 
-        private static Dictionary<Type, string> types = new(){ { Type.Dynamic, "dynamic" }, { Type.Object, "object" }, { Type.Void, "void" }, { Type.Bool, "bool" }, { Type.Int, "int" }, };
+        private static Dictionary<Type, string> types = new(){ { Type.Dynamic, "dynamic" }, { Type.Object, "object" }, { Type.Void, "void" }, { Type.Bool, "bool" }, { Type.Int, "int" }, { Type.String, "string" },};
         public static IReadOnlyDictionary<Type, string> reservedTypesDict => types;
 
         /// <summary>
@@ -104,6 +104,10 @@ namespace JScr.Runtime
                 {
                     return Type.Int;
                 }
+                case Values.ValueType.string_:
+                {
+                    return Type.String;
+                }
             }
 
             return Type.Dynamic;
@@ -122,7 +126,8 @@ namespace JScr.Runtime
             Object,
             Void,
             Bool,
-            Int
+            Int,
+            String,
         }
     }
 }

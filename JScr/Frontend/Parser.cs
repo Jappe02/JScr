@@ -74,6 +74,8 @@ namespace JScr.Frontend
                     return ParseType(); // <-- TODO
                 case TokenType.Return:
                     return ParseReturnStmt();
+                case TokenType.If:
+                    return ParseIfElseStmt();
                 default:
                     return ParseExpr();
             }
@@ -205,6 +207,59 @@ namespace JScr.Frontend
             return val;
         }
 
+        private Stmt ParseIfElseStmt()
+        {
+            IfElseDeclaration.IfBlock ParseElseIf()
+            {
+                Eat(); // eat if keyword
+
+                // Condition
+                outline++;
+                Expect(TokenType.OpenParen, "Open paren expected after 'if' keyword.");
+                var condition = ParseExpr();
+                Expect(TokenType.CloseParen, "Close paren expected after 'if' condition.");
+                outline--;
+
+                // Body
+                Expect(TokenType.OpenBrace, "Expected 'if' statement body following declaration.");
+                var body = new List<Stmt>();
+                while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+                {
+                    body.Add(ParseStmt());
+                }
+                Expect(TokenType.CloseBrace, "Closing brace expected inside 'if' statement.");
+
+                return new IfElseDeclaration.IfBlock(condition, body.ToArray());
+            }
+
+            List<IfElseDeclaration.IfBlock> blocks = new();
+            List<Stmt>? elseBody = null;
+
+            blocks.Add(ParseElseIf());
+
+            if (At().Type == TokenType.Else)
+            {
+                Eat();
+
+                if (At().Type == TokenType.If)
+                {
+                    blocks.Add(ParseElseIf());
+                } else
+                {
+                    elseBody = new();
+                    // `else` Body
+                    Expect(TokenType.OpenBrace, "Expected 'else' statement body following declaration.");
+                    while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+                    {
+                        elseBody.Add(ParseStmt());
+                    }
+                    Expect(TokenType.CloseBrace, "Closing brace expected inside 'else' statement.");
+                }
+            }
+
+            return new IfElseDeclaration(blocks.ToArray(), elseBody?.ToArray());
+        }
+
         private Expr ParseExpr()
         {
             return ParseAssignmentExpr();
@@ -228,7 +283,7 @@ namespace JScr.Frontend
         {
             if (At().Type != TokenType.OpenBrace)
             {
-                return ParseAdditiveExpr();
+                return ParseBoolExpr();
             }
 
             Eat(); // advance past open brace
@@ -236,19 +291,20 @@ namespace JScr.Frontend
 
             while (NotEOF() && At().Type != TokenType.CloseBrace)
             {
+                var type = Expect(TokenType.Type, "Type expected before object literal key.");
                 var key = Expect(TokenType.Identifier, "Object literal key expected.").Value;
 
                 // Allows shorthand key: pair -> { key, }.
                 if (At().Type == TokenType.Comma)
                 {
                     Eat(); // advance past comma
-                    properties.Add(new Property(key, null));
+                    properties.Add(new Property(key, Types.FromString(type.Value), null));
                     continue;
                 }
                 // Allows shorthand key: pair -> { key }.
                 else if (At().Type == TokenType.CloseBrace)
                 {
-                    properties.Add(new Property(key, null));
+                    properties.Add(new Property(key, Types.FromString(type.Value), null));
                     continue;
                 }
 
@@ -256,7 +312,7 @@ namespace JScr.Frontend
                 Expect(TokenType.Colon, "Missing colon following identifier in ObjectExpr.");
                 var value = ParseExpr();
 
-                properties.Add(new Property(key, value));
+                properties.Add(new Property(key, Types.FromString(type.Value), value));
                 if (At().Type != TokenType.CloseBrace)
                 {
                     Expect(TokenType.Comma, "Expected comma or closing bracket following property.");
@@ -265,6 +321,56 @@ namespace JScr.Frontend
 
             Expect(TokenType.CloseBrace, "Object literal missing closing brace.");
             return new ObjectLiteral(properties.ToArray());
+        }
+
+        private Expr ParseBoolExpr()
+        {
+            var left = ParseComparisonExpr();
+
+            if (At().Type == TokenType.Or && tokens[1].Type == TokenType.Or)
+            {
+                Eat(); Eat();
+                return new EqualityCheckExpr(left, ParseBoolExpr(), EqualityCheckExpr.Type.Or);
+            } else if (At().Type == TokenType.And && tokens[1].Type == TokenType.And)
+            {
+                Eat(); Eat();
+                return new EqualityCheckExpr(left, ParseBoolExpr(), EqualityCheckExpr.Type.And);
+            }
+
+            return left;
+        }
+
+        private Expr ParseComparisonExpr()
+        {
+            var left = ParseAdditiveExpr();
+
+            if (At().Type == TokenType.Equals && tokens[1].Type == TokenType.Equals)
+            {
+                Eat(); Eat();
+                return new EqualityCheckExpr(left, ParseAdditiveExpr(), EqualityCheckExpr.Type.Equals);
+            } else if (At().Type == TokenType.Not && tokens[1].Type == TokenType.Equals)
+            {
+                Eat(); Eat();
+                return new EqualityCheckExpr(left, ParseAdditiveExpr(), EqualityCheckExpr.Type.NotEquals);
+            } else if (At().Type == TokenType.LessThan)
+            {
+                Eat();
+                return new EqualityCheckExpr(left, ParseAdditiveExpr(), EqualityCheckExpr.Type.LessThan);
+            } else if (At().Type == TokenType.LessThan && tokens[1].Type == TokenType.Equals)
+            {
+                Eat(); Eat();
+                return new EqualityCheckExpr(left, ParseAdditiveExpr(), EqualityCheckExpr.Type.LessThanOrEquals);
+            } else if (At().Type == TokenType.MoreThan)
+            {
+                Eat();
+                return new EqualityCheckExpr(left, ParseAdditiveExpr(), EqualityCheckExpr.Type.MoreThan);
+            } else if (At().Type == TokenType.MoreThan && tokens[1].Type == TokenType.Equals)
+            {
+                Eat(); Eat();
+                return new EqualityCheckExpr(left, ParseAdditiveExpr(), EqualityCheckExpr.Type.MoreThanOrEquals);
+            }
+
+            return left;
         }
 
         private Expr ParseAdditiveExpr()
@@ -353,31 +459,20 @@ namespace JScr.Frontend
         {
             var object_ = ParsePrimaryExpr();
 
-            while (At().Type == TokenType.Dot || At().Type == TokenType.OpenBracket)
+            while (At().Type == TokenType.Dot)
             {
-                var operator_ = Eat();
+                Eat();
                 Expr property;
-                bool computed;
 
-                // non-computed values aka obj.expr
-                if (operator_.Type == TokenType.Dot)
+                // get identifier
+                property = ParsePrimaryExpr();
+
+                if (property.Kind != NodeType.Identifier)
                 {
-                    computed = false;
-                    // get identifier
-                    property = ParsePrimaryExpr();
-
-                    if (property.Kind != NodeType.Identifier)
-                    {
-                        ThrowSyntaxError("Cannot use dot operator without right hand side being an identifier.");
-                    }
-                } else
-                { // This allows obj[computedValue]
-                    computed = true;
-                    property = ParseExpr();
-                    Expect(TokenType.CloseBracket, "Missing closing bracket in computed value.");
+                    ThrowSyntaxError("Cannot use dot operator without right hand side being an identifier.");
                 }
-
-                object_ = new MemberExpr(object_, property, computed);
+                
+                object_ = new MemberExpr(object_, property as Identifier);
             }
 
             return object_;
@@ -393,6 +488,8 @@ namespace JScr.Frontend
                     return new Identifier(Eat().Value);
                 case TokenType.Number:
                     return new NumericLiteral(int.Parse(Eat().Value));
+                case TokenType.String:
+                    return new StringLiteral(Eat().Value);
                 case TokenType.OpenParen:
                     Eat();
                     var value = ParseExpr();

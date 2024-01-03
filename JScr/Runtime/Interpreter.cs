@@ -20,8 +20,12 @@ namespace JScr.Runtime
             switch (astNode.Kind) {
                 case NodeType.NumericLiteral:
                     return new IntegerVal((astNode as NumericLiteral).Value) as RuntimeVal;
+                case NodeType.StringLiteral:
+                    return new StringVal((astNode as StringLiteral).Value) as RuntimeVal;
                 case NodeType.Identifier:
                     return Expressions.EvalIdentifier(astNode as Identifier, env);
+                case NodeType.MemberExpr:
+                    return Expressions.EvalMemberExpr(astNode as MemberExpr, env);
                 case NodeType.ObjectLiteral:
                     return Expressions.EvalObjectExpr(astNode as ObjectLiteral, env);
                 case NodeType.CallExpr:
@@ -40,9 +44,11 @@ namespace JScr.Runtime
                     return Statements.EvalFunctionDeclaration(astNode as FunctionDeclaration, env);
                 case NodeType.ReturnDeclaration:
                     return Statements.EvalReturnDeclaration(astNode as ReturnDeclaration, env);
+                case NodeType.IfElseDeclaration:
+                    return Statements.EvalIfElseDeclaration(astNode as IfElseDeclaration, env);
 
                 // Handle unimplemented ast types as error
-                default:
+                default: // TODO: Eval member expr to make objects work
                     throw new RuntimeException($"This AST Node has not yet been setup for interpretation: {astNode}");
             }
         }

@@ -13,13 +13,17 @@ namespace JScr.Frontend
 
             // Literal Types
             Number,
+            String,
             Identifier,
 
             // Keywords
-            Const, Return,
+            Const, Return, If, Else,
 
             // Gruping * Operators
             BinaryOperator,
+            LessThan, MoreThan,
+            And, Or,
+            Not,
             Equals,
             Comma, Colon, Dot,
             Semicolon,
@@ -32,6 +36,8 @@ namespace JScr.Frontend
         static readonly Dictionary<string, TokenType> KEYWORDS = new() {
             { "const", TokenType.Const},
             { "return", TokenType.Return},
+            { "if", TokenType.If},
+            { "else", TokenType.Else},
         };
 
         public class Token
@@ -169,6 +175,21 @@ namespace JScr.Frontend
                 } else if (src[0] == '.')
                 {
                     Push(new Token(Shift(), TokenType.Dot));
+                } else if (src[0] == '<')
+                {
+                    Push(new Token(Shift(), TokenType.LessThan));
+                } else if (src[0] == '>')
+                {
+                    Push(new Token(Shift(), TokenType.MoreThan));
+                } else if (src[0] == '&')
+                {
+                    Push(new Token(Shift(), TokenType.And));
+                } else if (src[0] == '|')
+                {
+                    Push(new Token(Shift(), TokenType.Or));
+                } else if (src[0] == '!')
+                {
+                    Push(new Token(Shift(), TokenType.Not));
                 }
 
                 // HANDLE MULTICHARACTER KEYWORDS, TOKENS, IDENTIFIERS ETC...
@@ -214,6 +235,16 @@ namespace JScr.Frontend
                         }
 
                         Shift(); // SKIP THE CURRENT CHARACTER
+                    } else if (src[0] == '"') {
+                        Shift();
+                        var ident = "";
+
+                        while (src.Count > 0 && src[0] != '"')
+                        {
+                            ident += Shift();
+                        }
+
+                        Push(new Token(ident, TokenType.String));
                     } else
                     {
                         throw new SyntaxException(new(filedir, line, col, "Unrecognized character found in source."));

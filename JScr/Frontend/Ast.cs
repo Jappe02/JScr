@@ -13,6 +13,7 @@ namespace JScr.Frontend
             VarDeclaration,
             FunctionDeclaration,
             ReturnDeclaration,
+            IfElseDeclaration,
 
             // EXPRESSIONS
             AssignmentExpr,
@@ -23,6 +24,7 @@ namespace JScr.Frontend
             Property,
             ObjectLiteral,
             NumericLiteral,
+            StringLiteral,
             Identifier,
             BinaryExpr,
         }
@@ -84,6 +86,30 @@ namespace JScr.Frontend
             }
         }
 
+        public class IfElseDeclaration : Stmt
+        {
+            public class IfBlock
+            {
+                public Expr Condition { get; }
+                public Stmt[] Body { get; }
+
+                public IfBlock(Expr condition, Stmt[] body)
+                {
+                    Condition = condition;
+                    Body = body;
+                }
+            }
+
+            public IfBlock[] Blocks { get; }
+            public Stmt[]? ElseBody { get; }
+
+            public IfElseDeclaration(IfBlock[] blocks, Stmt[]? elseBody) : base(NodeType.IfElseDeclaration)
+            {
+                Blocks = blocks;
+                ElseBody = elseBody;
+            }
+        }
+
         public abstract class Expr : Stmt
         {
             public Expr(NodeType kind) : base(kind) { }
@@ -97,6 +123,25 @@ namespace JScr.Frontend
             public AssignmentExpr(Expr assigne, Expr value) : base(NodeType.AssignmentExpr) {
                 Assigne = assigne;
                 Value = value;
+            }
+        }
+
+        public class EqualityCheckExpr : Expr
+        {
+            public enum Type
+            {
+                Equals, NotEquals, MoreThan, MoreThanOrEquals, LessThan, LessThanOrEquals, And, Or
+            }
+
+            public Expr Left { get; }
+            public Expr Right { get; }
+            public Type Operator { get; }
+
+            public EqualityCheckExpr(Expr left, Expr right, Type operator_) : base(NodeType.AssignmentExpr)
+            {
+                Left = left;
+                Right = right;
+                Operator = operator_;
             }
         }
 
@@ -129,14 +174,12 @@ namespace JScr.Frontend
         public class MemberExpr : Expr
         {
             public Expr Object { get; }
-            public Expr Property { get; }
-            public bool Computed { get; }
+            public Identifier Property { get; }
 
-            public MemberExpr(Expr object_, Expr property, bool computed) : base(NodeType.MemberExpr)
+            public MemberExpr(Expr object_, Identifier property) : base(NodeType.MemberExpr)
             {
                 Object = object_;
                 Property = property;
-                Computed = computed;
             }
         }
 
@@ -154,13 +197,22 @@ namespace JScr.Frontend
             public NumericLiteral(int value) : base(NodeType.NumericLiteral) { Value = value; }
         }
 
+        public class StringLiteral : Expr
+        {
+            public string Value { get; }
+
+            public StringLiteral(string value) : base(NodeType.StringLiteral) { Value = value; }
+        }
+
         public class Property : Expr
         {
             public string Key { get; }
+            public Types.Type Type { get; }
             public Expr? Value { get; }
 
-            public Property(string key, Expr? value) : base(NodeType.Property) {
+            public Property(string key, Types.Type? type, Expr? value) : base(NodeType.Property) {
                 Key = key;
+                Type = type ?? Types.Type.Void;
                 Value = value;
             }
         }
