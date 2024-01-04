@@ -17,7 +17,7 @@ namespace JScr.Frontend
             Identifier,
 
             // Keywords
-            Const, Return, If, Else,
+            Const, Return, If, Else, While, For,
 
             // Gruping * Operators
             BinaryOperator,
@@ -38,6 +38,8 @@ namespace JScr.Frontend
             { "return", TokenType.Return},
             { "if", TokenType.If},
             { "else", TokenType.Else},
+            { "while", TokenType.While},
+            { "for", TokenType.For},
         };
 
         public class Token

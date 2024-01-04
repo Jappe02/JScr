@@ -14,9 +14,12 @@ namespace JScr.Frontend
             FunctionDeclaration,
             ReturnDeclaration,
             IfElseDeclaration,
+            WhileDeclaration,
+            ForDeclaration,
 
             // EXPRESSIONS
             AssignmentExpr,
+            EqualityCheckExpr,
             MemberExpr,
             CallExpr,
 
@@ -110,6 +113,34 @@ namespace JScr.Frontend
             }
         }
 
+        public class WhileDeclaration : Stmt
+        {
+            public Expr Condition { get; }
+            public Stmt[] Body { get; }
+
+            public WhileDeclaration(Expr condition, Stmt[] body) : base(NodeType.WhileDeclaration)
+            {
+                Condition = condition;
+                Body = body;
+            }
+        }
+
+        public class ForDeclaration : Stmt
+        {
+            public Stmt Declaration { get; }
+            public Expr Condition { get; }
+            public Expr Action { get; }
+            public Stmt[] Body { get; }
+
+            public ForDeclaration(Stmt declaration, Expr condition, Expr action, Stmt[] body) : base(NodeType.ForDeclaration)
+            {
+                Declaration = declaration;
+                Condition = condition;
+                Action = action;
+                Body = body;
+            }
+        }
+
         public abstract class Expr : Stmt
         {
             public Expr(NodeType kind) : base(kind) { }
@@ -137,7 +168,7 @@ namespace JScr.Frontend
             public Expr Right { get; }
             public Type Operator { get; }
 
-            public EqualityCheckExpr(Expr left, Expr right, Type operator_) : base(NodeType.AssignmentExpr)
+            public EqualityCheckExpr(Expr left, Expr right, Type operator_) : base(NodeType.EqualityCheckExpr)
             {
                 Left = left;
                 Right = right;

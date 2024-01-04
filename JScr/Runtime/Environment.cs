@@ -81,7 +81,7 @@ namespace JScr.Runtime
                 throw new RuntimeException($"Cannot resign to variable \"{varname}\". Type and new value do not match.");
             }
 
-            env.variables.Add(varname, value);
+            env.variables[varname] = value;
             return value;
         }
 

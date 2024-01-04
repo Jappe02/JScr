@@ -42,7 +42,8 @@ namespace JScr.Runtime.Eval
 
         public static RuntimeVal EvalIfElseDeclaration(IfElseDeclaration declaration, Environment env)
         {
-            foreach (var block in declaration.Blocks) {
+            foreach (var block in declaration.Blocks)
+            {
                 var val = Interpreter.Evaluate(block.Condition, env);
 
                 // Verify valid bool
@@ -70,6 +71,49 @@ namespace JScr.Runtime.Eval
                 {
                     Interpreter.Evaluate(stmt, scope);
                 }
+            }
+
+            return new NullVal();
+        }
+
+        public static RuntimeVal EvalWhileDeclaration(WhileDeclaration declaration, Environment env)
+        {
+            var val = Interpreter.Evaluate(declaration.Condition, env);
+
+            if (val.Type != Values.ValueType.boolean)
+                throw new RuntimeException("While statement condition needs to be a boolean.");
+
+            while ((val as BoolVal).Value)
+            {
+                val = Interpreter.Evaluate(declaration.Condition, env);
+
+                var scope = new Environment(env);
+                foreach (var stmt in declaration.Body)
+                {
+                    Interpreter.Evaluate(stmt, scope);
+                }
+            }
+
+            return new NullVal();
+        }
+
+        public static RuntimeVal EvalForDeclaration(ForDeclaration declaration, Environment env)
+        {
+            var scope = new Environment(env);
+            Interpreter.Evaluate(declaration.Declaration, scope);
+            var condition = Interpreter.Evaluate(declaration.Condition, scope);
+
+            if (condition.Type != Values.ValueType.boolean)
+                throw new RuntimeException("For statement condition needs to be a boolean.");
+
+            while ((condition as BoolVal).Value)
+            {
+                foreach (var stmt in declaration.Body)
+                {
+                    Interpreter.Evaluate(stmt, scope);
+                }
+                Interpreter.Evaluate(declaration.Action, scope);
+                condition = Interpreter.Evaluate(declaration.Condition, scope);
             }
 
             return new NullVal();

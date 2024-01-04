@@ -32,6 +32,8 @@ namespace JScr.Runtime
                     return Expressions.EvalCallExpr(astNode as CallExpr, env);
                 case NodeType.AssignmentExpr:
                     return Expressions.EvalAssignment(astNode as AssignmentExpr, env);
+                case NodeType.EqualityCheckExpr:
+                    return Expressions.EvalEqualityCheckExpr(astNode as EqualityCheckExpr, env);
                 case NodeType.BinaryExpr:
                     return Expressions.EvalBinaryExpr(astNode as BinaryExpr, env);
                 /*case NodeType.Program:
@@ -46,6 +48,10 @@ namespace JScr.Runtime
                     return Statements.EvalReturnDeclaration(astNode as ReturnDeclaration, env);
                 case NodeType.IfElseDeclaration:
                     return Statements.EvalIfElseDeclaration(astNode as IfElseDeclaration, env);
+                case NodeType.WhileDeclaration:
+                    return Statements.EvalWhileDeclaration(astNode as WhileDeclaration, env);
+                case NodeType.ForDeclaration:
+                    return Statements.EvalForDeclaration(astNode as ForDeclaration, env);
 
                 // Handle unimplemented ast types as error
                 default: // TODO: Eval member expr to make objects work

@@ -1,4 +1,5 @@
 ﻿using JScr.Frontend;
+using System.Net.Http.Headers;
 using static JScr.Frontend.Ast;
 using static JScr.Runtime.Values;
 using ValueType = JScr.Runtime.Values.ValueType;
@@ -64,6 +65,44 @@ namespace JScr.Runtime.Eval
 
             var varname = (node.Assigne as Identifier).Symbol;
             return env.AssignVar(varname, Interpreter.Evaluate(node.Value, env));
+        }
+
+        // TODO: Allow each type to declare their own ways to compare other types and stuff. (= cleaner code).
+        public static RuntimeVal EvalEqualityCheckExpr(EqualityCheckExpr node, Environment env)
+        {
+            var lhs = Interpreter.Evaluate(node.Left, env);
+            var rhs = Interpreter.Evaluate(node.Right, env);
+
+            switch (node.Operator)
+            {
+                case EqualityCheckExpr.Type.Equals:
+                    return new BoolVal(lhs.Equals(rhs));
+                case EqualityCheckExpr.Type.NotEquals:
+                    return new BoolVal(!lhs.Equals(rhs));
+                case EqualityCheckExpr.Type.LessThan:
+                    return new BoolVal((lhs as IntegerVal).Value < (rhs as IntegerVal).Value);
+                case EqualityCheckExpr.Type.LessThanOrEquals:
+                    return new BoolVal((lhs as IntegerVal).Value <= (rhs as IntegerVal).Value);
+                case EqualityCheckExpr.Type.MoreThan:
+                    return new BoolVal((lhs as IntegerVal).Value > (rhs as IntegerVal).Value);
+                case EqualityCheckExpr.Type.MoreThanOrEquals:
+                    return new BoolVal((lhs as IntegerVal).Value >= (rhs as IntegerVal).Value);
+
+                case EqualityCheckExpr.Type.And:
+                {
+                    if (lhs.Type == ValueType.boolean && rhs.Type == ValueType.boolean)
+                        return new BoolVal((lhs as BoolVal).Value && (rhs as BoolVal).Value);
+                    return new BoolVal(false);
+                }
+                case EqualityCheckExpr.Type.Or:
+                {
+                    if (lhs.Type == ValueType.boolean || rhs.Type == ValueType.boolean)
+                        return new BoolVal((lhs as BoolVal).Value || (rhs as BoolVal).Value);
+                    return new BoolVal(false);
+                }
+            }
+
+            return new BoolVal(false);
         }
 
         public static RuntimeVal EvalObjectExpr(ObjectLiteral obj, Environment env)

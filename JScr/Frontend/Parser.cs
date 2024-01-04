@@ -76,6 +76,10 @@ namespace JScr.Frontend
                     return ParseReturnStmt();
                 case TokenType.If:
                     return ParseIfElseStmt();
+                case TokenType.While:
+                    return ParseWhileStmt();
+                case TokenType.For:
+                    return ParseForStmt();
                 default:
                     return ParseExpr();
             }
@@ -189,7 +193,7 @@ namespace JScr.Frontend
             Expect(TokenType.Equals, "Expected equals token following identifier in var declaration.");
             outline++;
             var declaration = new VarDeclaration(constant, Types.FromString(type.Value), name.Value, ParseExpr());
-            Expect(TokenType.Semicolon, "Variable declaration statement must end with semicolon.");
+            if (outline <= 1) Expect(TokenType.Semicolon, "Outline variable declaration statement must end with semicolon.");
             outline--;
 
             return declaration;
@@ -221,13 +225,19 @@ namespace JScr.Frontend
                 outline--;
 
                 // Body
-                Expect(TokenType.OpenBrace, "Expected 'if' statement body following declaration.");
                 var body = new List<Stmt>();
-                while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+                if (At().Type == TokenType.OpenBrace)
+                {
+                    Eat();
+                    while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+                    {
+                        body.Add(ParseStmt());
+                    }
+                    Expect(TokenType.CloseBrace, "Closing brace expected inside 'if' statement.");
+                } else
                 {
                     body.Add(ParseStmt());
                 }
-                Expect(TokenType.CloseBrace, "Closing brace expected inside 'if' statement.");
 
                 return new IfElseDeclaration.IfBlock(condition, body.ToArray());
             }
@@ -246,18 +256,95 @@ namespace JScr.Frontend
                     blocks.Add(ParseElseIf());
                 } else
                 {
-                    elseBody = new();
                     // `else` Body
-                    Expect(TokenType.OpenBrace, "Expected 'else' statement body following declaration.");
-                    while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+                    if (At().Type == TokenType.OpenBrace)
                     {
-                        elseBody.Add(ParseStmt());
+                        Eat();
+                        while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+                        {
+                            elseBody = new()
+                            {
+                                ParseStmt()
+                            };
+                        }
+                        Expect(TokenType.CloseBrace, "Closing brace expected inside 'else' statement.");
+                    } else
+                    {
+                        elseBody = new()
+                        {
+                            ParseStmt()
+                        };
                     }
-                    Expect(TokenType.CloseBrace, "Closing brace expected inside 'else' statement.");
                 }
             }
 
             return new IfElseDeclaration(blocks.ToArray(), elseBody?.ToArray());
+        }
+
+        private Stmt ParseWhileStmt()
+        {
+            Eat(); // eat while keyword
+
+            // Condition
+            outline++;
+            Expect(TokenType.OpenParen, "Open paren expected after 'while' keyword.");
+            var condition = ParseExpr();
+            Expect(TokenType.CloseParen, "Close paren expected after 'while' condition.");
+            outline--;
+
+            // Body
+            var body = new List<Stmt>();
+            if (At().Type == TokenType.OpenBrace)
+            {
+                Eat();
+                while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+                {
+                    body.Add(ParseStmt());
+                }
+                Expect(TokenType.CloseBrace, "Closing brace expected inside 'while' statement.");
+            } else
+            {
+                body.Add(ParseStmt());
+            }
+
+            return new WhileDeclaration(condition, body.ToArray());
+        }
+
+        private Stmt ParseForStmt()
+        {
+            Eat(); // eat for keyword
+
+            // Condition
+            outline++;
+            
+            Expect(TokenType.OpenParen, "Open paren expected after 'for' keyword.");
+            var variableDecl = ParseStmt();
+            Expect(TokenType.Semicolon, "Semicolon expected after variable declaration in 'for' loop.");
+
+            var condition = ParseExpr();
+            Expect(TokenType.Semicolon, "Semicolon expected after condition in 'for' loop.");
+            
+            var action = ParseExpr();
+            Expect(TokenType.CloseParen, "Close paren expected after 'for' condition.");
+            
+            outline--;
+
+            // Body
+            var body = new List<Stmt>();
+            if (At().Type == TokenType.OpenBrace)
+            {
+                Eat();
+                while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+                {
+                    body.Add(ParseStmt());
+                }
+                Expect(TokenType.CloseBrace, "Closing brace expected inside 'while' statement.");
+            } else
+            {
+                body.Add(ParseStmt());
+            }
+
+            return new ForDeclaration(variableDecl, condition, action, body.ToArray());
         }
 
         private Expr ParseExpr()
@@ -272,7 +359,10 @@ namespace JScr.Frontend
             if (At().Type == TokenType.Equals)
             {
                 Eat(); // Advance past equal
+                outline++;
                 var value = ParseAssignmentExpr();
+                if (outline <= 1) Expect(TokenType.Semicolon, "Semicolon expected after outline assignment expr.");
+                outline--;
                 return new AssignmentExpr(left, value);
             }
 
