@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+﻿using Newtonsoft.Json;
 
 namespace JScr
 {
@@ -49,7 +49,7 @@ namespace JScr
         /// <returns></returns>
         public static string ToJson(this object obj)
         {
-            return JsonSerializer.Serialize(obj);
+            return JsonConvert.SerializeObject(obj);
         }
     }
 }

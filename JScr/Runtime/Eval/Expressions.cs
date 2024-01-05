@@ -115,10 +115,20 @@ namespace JScr.Runtime.Eval
                 var value = prop.Value;
 
                 var runtimeVal = (value == null) ? new NullVal() : Interpreter.Evaluate(value, env);
-                //object_.Properties[key] = runtimeVal;
                 object_.Properties.Add(new ObjectVal.Property(key, type, runtimeVal));
             }
             return object_;
+        }
+
+        public static RuntimeVal EvalArrayExpr(ArrayLiteral obj, Environment env)
+        {
+            var elements = new List<RuntimeVal>();
+            foreach (var item in obj.Value)
+            {
+                var runtimeVal = (item == null) ? new NullVal() : Interpreter.Evaluate(item, env);
+                elements.Add(runtimeVal);
+            }
+            return new ArrayVal(elements.ToArray());
         }
 
         public static RuntimeVal EvalMemberExpr(MemberExpr node, Environment env)

@@ -26,8 +26,10 @@ namespace JScr.Frontend
             // LITERALS
             Property,
             ObjectLiteral,
+            ArrayLiteral,
             NumericLiteral,
             StringLiteral,
+            CharLiteral,
             Identifier,
             BinaryExpr,
         }
@@ -221,6 +223,13 @@ namespace JScr.Frontend
             public Identifier(string symbol) : base(NodeType.Identifier) { Symbol = symbol; }
         }
 
+        public class ArrayLiteral : Expr
+        {
+            public Expr[] Value { get; }
+
+            public ArrayLiteral(Expr[] value) : base(NodeType.ArrayLiteral) { Value = value; }
+        }
+
         public class NumericLiteral : Expr
         {
             public int Value { get; }
@@ -233,6 +242,13 @@ namespace JScr.Frontend
             public string Value { get; }
 
             public StringLiteral(string value) : base(NodeType.StringLiteral) { Value = value; }
+        }
+
+        public class CharLiteral : Expr
+        {
+            public char Value { get; }
+
+            public CharLiteral(char value) : base(NodeType.CharLiteral) { Value = value; }
         }
 
         public class Property : Expr

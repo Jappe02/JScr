@@ -14,10 +14,11 @@ namespace JScr.Frontend
             // Literal Types
             Number,
             String,
+            Char,
             Identifier,
 
             // Keywords
-            Const, Return, If, Else, While, For,
+            Const, Export, Return, If, Else, While, For,
 
             // Gruping * Operators
             BinaryOperator,
@@ -35,6 +36,7 @@ namespace JScr.Frontend
 
         static readonly Dictionary<string, TokenType> KEYWORDS = new() {
             { "const", TokenType.Const},
+            { "export", TokenType.Export},
             { "return", TokenType.Return},
             { "if", TokenType.If},
             { "else", TokenType.Else},
@@ -238,7 +240,7 @@ namespace JScr.Frontend
 
                         Shift(); // SKIP THE CURRENT CHARACTER
                     } else if (src[0] == '"') {
-                        Shift();
+                        Shift(); // < begin quote
                         var ident = "";
 
                         while (src.Count > 0 && src[0] != '"')
@@ -246,7 +248,16 @@ namespace JScr.Frontend
                             ident += Shift();
                         }
 
+                        Shift(); // < end quote
+
                         Push(new Token(ident, TokenType.String));
+                    } else if (src[0] == '\'')
+                    {
+                        Shift(); // < begin quote
+                        char ident = Shift();
+                        Shift(); // < end quote
+
+                        Push(new Token(ident, TokenType.Char));
                     } else
                     {
                         throw new SyntaxException(new(filedir, line, col, "Unrecognized character found in source."));

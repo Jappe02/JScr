@@ -14,20 +14,23 @@ namespace JScr.Runtime
             return Statements.EvalProgram(program, env, ref running);
         }
 
-        // TODO Make fully async & FIX ISSUES BECAUSE RETURN TYPE CHANGED TO ASYNC
         public static RuntimeVal Evaluate(Stmt astNode, Environment env)
         {
             switch (astNode.Kind) {
                 case NodeType.NumericLiteral:
-                    return new IntegerVal((astNode as NumericLiteral).Value) as RuntimeVal;
+                    return new IntegerVal((astNode as NumericLiteral).Value);
                 case NodeType.StringLiteral:
-                    return new StringVal((astNode as StringLiteral).Value) as RuntimeVal;
+                    return new StringVal((astNode as StringLiteral).Value);
+                case NodeType.CharLiteral:
+                    return new CharVal((astNode as CharLiteral).Value);
                 case NodeType.Identifier:
                     return Expressions.EvalIdentifier(astNode as Identifier, env);
                 case NodeType.MemberExpr:
                     return Expressions.EvalMemberExpr(astNode as MemberExpr, env);
                 case NodeType.ObjectLiteral:
                     return Expressions.EvalObjectExpr(astNode as ObjectLiteral, env);
+                case NodeType.ArrayLiteral:
+                    return Expressions.EvalArrayExpr(astNode as ArrayLiteral, env);
                 case NodeType.CallExpr:
                     return Expressions.EvalCallExpr(astNode as CallExpr, env);
                 case NodeType.AssignmentExpr:

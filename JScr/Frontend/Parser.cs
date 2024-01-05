@@ -69,6 +69,7 @@ namespace JScr.Frontend
         {
             switch (At().Type)
             {
+                case TokenType.Export:
                 case TokenType.Const:
                 case TokenType.Type:
                     return ParseType(); // <-- TODO
@@ -89,8 +90,9 @@ namespace JScr.Frontend
         {
             Token? type = null;
             bool constant = false;
+            bool exported = false;
 
-            while (At().Type == TokenType.Type || At().Type == TokenType.Const)
+            while (At().Type == TokenType.Type || At().Type == TokenType.Const || At().Type == TokenType.Export)
             {
                 if (At().Type == TokenType.Const && !constant)
                 {
@@ -99,6 +101,14 @@ namespace JScr.Frontend
                 } else if (At().Type == TokenType.Type && type == null)
                 {
                     type = Eat();
+                    if (At().Type == TokenType.OpenBracket) {
+                        Eat();
+                        Expect(TokenType.CloseBracket, "Closing bracket expected after open bracket in array declaration.");
+                        type = new Token(type.Value + "[]", type.Type);
+                    }
+                } else if (At().Type == TokenType.Export && !exported)
+                {
+                    exported = true;
                 }
             }
 
@@ -354,7 +364,7 @@ namespace JScr.Frontend
 
         private Expr ParseAssignmentExpr()
         {
-            var left = ParseObjectExpr();
+            var left = ParseObjectArrayExpr();
 
             if (At().Type == TokenType.Equals)
             {
@@ -369,7 +379,7 @@ namespace JScr.Frontend
             return left;
         }
 
-        private Expr ParseObjectExpr()
+        private Expr ParseObjectArrayExpr()
         {
             if (At().Type != TokenType.OpenBrace)
             {
@@ -377,40 +387,54 @@ namespace JScr.Frontend
             }
 
             Eat(); // advance past open brace
-            var properties = new List<Property>();
+            bool isArray = false;
+            var objectProperties = new List<Property>();
+            var arrayElements = new List<Expr>();
 
             while (NotEOF() && At().Type != TokenType.CloseBrace)
             {
-                var type = Expect(TokenType.Type, "Type expected before object literal key.");
-                var key = Expect(TokenType.Identifier, "Object literal key expected.").Value;
-
-                // Allows shorthand key: pair -> { key, }.
-                if (At().Type == TokenType.Comma)
+                if (At().Type == TokenType.Type)
                 {
-                    Eat(); // advance past comma
-                    properties.Add(new Property(key, Types.FromString(type.Value), null));
-                    continue;
-                }
-                // Allows shorthand key: pair -> { key }.
-                else if (At().Type == TokenType.CloseBrace)
-                {
-                    properties.Add(new Property(key, Types.FromString(type.Value), null));
-                    continue;
-                }
+                    var type = Eat();
+                    var key = Expect(TokenType.Identifier, "Object literal key expected.").Value;
 
-                // { key: val }
-                Expect(TokenType.Colon, "Missing colon following identifier in ObjectExpr.");
-                var value = ParseExpr();
+                    // Allows shorthand key: pair -> { key, }.
+                    if (At().Type == TokenType.Comma)
+                    {
+                        Eat(); // advance past comma
+                        objectProperties.Add(new Property(key, Types.FromString(type.Value), null));
+                        continue;
+                    }
+                    // Allows shorthand key: pair -> { key }.
+                    else if (At().Type == TokenType.CloseBrace)
+                    {
+                        objectProperties.Add(new Property(key, Types.FromString(type.Value), null));
+                        continue;
+                    }
 
-                properties.Add(new Property(key, Types.FromString(type.Value), value));
-                if (At().Type != TokenType.CloseBrace)
+                    // { key: val }
+                    Expect(TokenType.Colon, "Missing colon following identifier in ObjectExpr.");
+                    var value = ParseExpr();
+
+                    objectProperties.Add(new Property(key, Types.FromString(type.Value), value));
+                    if (At().Type != TokenType.CloseBrace)
+                    {
+                        Expect(TokenType.Comma, "Expected comma or closing bracket following property.");
+                    }
+                } else
                 {
-                    Expect(TokenType.Comma, "Expected comma or closing bracket following property.");
+                    isArray = true;
+                    var value = ParseExpr();
+                    arrayElements.Add(value);
+                    if (At().Type != TokenType.CloseBrace)
+                    {
+                        Expect(TokenType.Comma, "Expected comma or closing bracket following array element.");
+                    }
                 }
             }
 
-            Expect(TokenType.CloseBrace, "Object literal missing closing brace.");
-            return new ObjectLiteral(properties.ToArray());
+            Expect(TokenType.CloseBrace, !isArray ? "Object literal missing closing brace." : "Array literal missing closing brace.");
+            return !isArray ? new ObjectLiteral(objectProperties.ToArray()) : new ArrayLiteral(arrayElements.ToArray());
         }
 
         private Expr ParseBoolExpr()
@@ -580,6 +604,8 @@ namespace JScr.Frontend
                     return new NumericLiteral(int.Parse(Eat().Value));
                 case TokenType.String:
                     return new StringLiteral(Eat().Value);
+                case TokenType.Char:
+                    return new CharLiteral(Eat().Value.ToCharArray()[0]);
                 case TokenType.OpenParen:
                     Eat();
                     var value = ParseExpr();

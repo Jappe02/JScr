@@ -8,8 +8,10 @@ namespace JScr.Runtime
         public enum ValueType
         {
             null_,
+            array,
             integer,
             string_,
+            char_,
             boolean,
             object_,
             function,
@@ -30,11 +32,20 @@ namespace JScr.Runtime
 
         public class NullVal : RuntimeVal
         {
-            public dynamic? Value { get; }
+            public dynamic? Value => null;
 
-            public NullVal() : base(ValueType.null_) { Value = null; }
+            public NullVal() : base(ValueType.null_) { }
 
-            public override string ToString() => Value.ToString() ?? "";
+            public override string ToString() => "null";
+        }
+
+        public class ArrayVal : RuntimeVal
+        {
+            public RuntimeVal[] Value { get; }
+
+            public ArrayVal(RuntimeVal[] value) : base(ValueType.array) { Value = value; }
+
+            public override string ToString() => Value.ToJson();
         }
 
         public class BoolVal : RuntimeVal
@@ -60,6 +71,15 @@ namespace JScr.Runtime
             public string Value { get; }
 
             public StringVal(string value = "") : base(ValueType.string_) { Value = value; }
+
+            public override string ToString() => Value.ToString();
+        }
+
+        public class CharVal : RuntimeVal
+        {
+            public char Value { get; }
+
+            public CharVal(char value) : base(ValueType.char_) { Value = value; }
 
             public override string ToString() => Value.ToString();
         }
