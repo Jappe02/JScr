@@ -6,7 +6,7 @@ namespace JScr.Runtime
 {
     internal static class Types
     {
-        private static Dictionary<Type, string> types = new(){ { Type.Dynamic, "dynamic" }, { Type.Object, "object" }, { Type.Void, "void" }, { Type.Bool, "bool" }, { Type.Int, "int" }, { Type.String, "string" }, { Type.Char, "char" },};
+        private static Dictionary<Type, string> types = new(){ { Type.Dynamic(), "dynamic" }, /*{ Type.Object(), "object" },*/ { Type.Void(), "void" }, { Type.Bool(), "bool" }, { Type.Int(), "int" }, { Type.String(), "string" }, { Type.Char(), "char" },};
         public static IReadOnlyDictionary<Type, string> reservedTypesDict => types;
 
         /// <summary>
@@ -26,13 +26,21 @@ namespace JScr.Runtime
                 return arrayType != null ? Type.Array(arrayType) : null;
             }
 
-            return types.FirstOrDefault(x => x.Value == val).Key;
+            var type = types.FirstOrDefault(x => x.Value == val).Key;
+
+            if (type == null)
+            {
+                return Type.Object(val);
+            }
+
+            return type;
         }
 
         /// <summary>
         /// Find a suitable return type for a [Values.ValueType].
         /// </summary>
-        public static Type SuitableType(RuntimeVal? runtimeVal)
+        /// <returns>Null if it is suitable for any type.</returns>
+        public static Type? SuitableType(RuntimeVal? runtimeVal)
         {
             Values.ValueType? valueType = runtimeVal?.Type;
 
@@ -43,6 +51,10 @@ namespace JScr.Runtime
 
             switch (valueType)
             {
+                case Values.ValueType.null_:
+                {
+                    return null;
+                }
                 case Values.ValueType.array:
                 {
                     if (runtimeVal == null)
@@ -55,7 +67,7 @@ namespace JScr.Runtime
                     {
                         var oldType = type;
                         type = SuitableType(t);
-                        if (oldType != null && oldType != type)
+                        if (oldType != null && !oldType.Equals(type))
                         {
                             dynamic = true;
                             break;
@@ -64,57 +76,71 @@ namespace JScr.Runtime
 
                     if (type == null) dynamic = true;
 
-                    return Type.Array(dynamic ? Type.Dynamic : type);
+                    return Type.Array(dynamic ? Type.Dynamic() : type);
                 }
-                case Values.ValueType.object_:
+                case Values.ValueType.objectInstance:
                 {
-                    return Type.Object;
+                    if (runtimeVal == null)
+                        break;
+
+                    var objVal = (ObjectInstanceVal)runtimeVal;
+                    return Type.Object(objVal.ObjType);
                 }
                 case null: {
-                    return Type.Void;
+                    return Type.Void();
                 }
                 case Values.ValueType.boolean:
                 {
-                    return Type.Bool;
+                    return Type.Bool();
                 }
                 case Values.ValueType.integer:
                 {
-                    return Type.Int;
+                    return Type.Int();
                 }
                 case Values.ValueType.string_:
                 {
-                    return Type.String;
+                    return Type.String();
                 }
                 case Values.ValueType.char_:
                 {
-                    return Type.Char;
+                    return Type.Char();
                 }
             }
 
-            return Type.Dynamic;
+            return Type.Dynamic();
         }
 
         /// <summary>Check if a [RuntimeVal] matches the specified [Type].</summary>
         /// <returns>False if the input [RuntimeVal] has a different type than the `type` parameter.</returns>
         public static bool RuntimeValMatchesType(Type type, RuntimeVal runtimeVal)
         {
-            return SuitableType(runtimeVal).Equals(type);
+            var suitable = SuitableType(runtimeVal);
+
+            return suitable != null ? suitable.Equals(type) : true;
         }
 
         public class Type : IComparable<Type>
         {
             public ushort Val { get; }
+            public string? Data { get; }
             public Type? Child { get; }
-            private Type(ushort v, Type? child = null) { Val = v; Child = child; }
+            public Type[]? LambdaTypes { get; }
 
-            public static Type Array(Type of) => new(0, of);
-            public static readonly Type Dynamic = new(1);
-            public static readonly Type Object = new(2);
-            public static readonly Type Void = new(3);
-            public static readonly Type Bool = new(4);
-            public static readonly Type Int = new(5);
-            public static readonly Type String = new(6);
-            public static readonly Type Char = new(7);
+            public bool IsLambda => LambdaTypes != null;
+
+            private Type(ushort v, Type[]? lambdaTypes, Type? child = null, string? data = null)
+            {
+                Val = v; LambdaTypes = lambdaTypes?.Length == 0 ? null : lambdaTypes; Child = child; Data = data;
+            }
+
+            public static Type Array(Type of, Type[]? lambdaTypes = null) => new(0, lambdaTypes, of);
+            public static Type Dynamic(Type[]? lambdaTypes = null) => new(1, lambdaTypes);
+            public static Type Object(string name, Type[]? lambdaTypes = null) => new(2, lambdaTypes, data: name);
+            public static Type Void(Type[]? lambdaTypes = null) => new(3, lambdaTypes);
+            public static Type Bool(Type[]? lambdaTypes = null) => new(4, lambdaTypes);
+            public static Type Int(Type[]? lambdaTypes = null) => new(5, lambdaTypes);
+            public static Type String(Type[]? lambdaTypes = null) => new(6, lambdaTypes);
+            public static Type Char(Type[]? lambdaTypes = null) => new(7, lambdaTypes);
 
             public int CompareTo(Type? other)
             {
@@ -131,8 +157,23 @@ namespace JScr.Runtime
                 Type other = (Type)obj;
                 if (Val == other.Val)
                 {
-                    if (Child != null) return Child.Equals(other.Child);
-                    return true;
+                    bool sameChild = true;
+                    bool sameData = true;
+                    bool sameLambdaTypes = true;
+                    if (Child != null) sameChild = Child.Equals(other.Child);
+                    if (Data != null) sameData = Data.Equals(other.Data);
+                    if (LambdaTypes != null)
+                    {
+                        for (int i = 0; i < LambdaTypes.Length; i++)
+                        {
+                            if (!LambdaTypes[i].Equals(other.LambdaTypes?.ElementAtOrDefault(i)))
+                            {
+                                sameLambdaTypes = false;
+                                break;
+                            }
+                        }
+                    }
+                    return sameChild && sameLambdaTypes;
                 }
 
                 return false;
@@ -141,6 +182,11 @@ namespace JScr.Runtime
             public override int GetHashCode()
             {
                 return (Val, Child).GetHashCode();
+            }
+
+            public Type CopyWith(Type[]? lambdaTypes = null, Type? child = null, string? data = null)
+            {
+                return new Type(Val, lambdaTypes ?? LambdaTypes, child ?? Child, data ?? Data);
             }
         }
 

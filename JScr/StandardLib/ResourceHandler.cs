@@ -8,7 +8,10 @@ namespace JScr.StandardLib
         {
             using (Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("JScr.Resources.StandardLib." + resourceName))
             {
-                return stream?.ToString();
+                using (var reader = new StreamReader(stream))
+                {
+                    return reader.ReadToEnd();
+                }
             }
         }
     }

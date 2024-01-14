@@ -1,4 +1,7 @@
 ﻿using JScr.Runtime;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Xml.Linq;
 using static JScr.Frontend.Ast;
 using static JScr.Frontend.Lexer;
 using static JScr.Runtime.Types;
@@ -8,6 +11,19 @@ namespace JScr.Frontend
 {
     internal class Parser
     {
+        class ParseTypeContext
+        {
+            public Types.Type Type { get; }
+            public bool Constant { get; }
+            public bool Exported { get; }
+
+            public ParseTypeContext(Types.Type type, bool constant, bool exported) {
+                Type = type;
+                Constant = constant;
+                Exported = exported;
+            }
+        }
+
         private List<Token> tokens = new();
         private List<uint[]> linesAndCols = new();
 
@@ -37,7 +53,7 @@ namespace JScr.Frontend
                 ThrowSyntaxError(syntaxExceptionDescription);
             }
         
-            return prev;
+            return prev!;
         }
 
         private void ThrowSyntaxError(string description)
@@ -52,7 +68,7 @@ namespace JScr.Frontend
             linesAndCols = tokenDictionary.Values.ToList();
             linesAndCols.Add(linesAndCols.Last()); // <-- Add duplicate of last item to prevent index out of range exception if syntax error on last token.
 
-            var program = new Program(new List<Stmt>());
+            var program = new Program(filedir, new List<Stmt>());
 
             this.filedir = filedir;
 
@@ -69,65 +85,163 @@ namespace JScr.Frontend
         {
             switch (At().Type)
             {
+                case TokenType.Import:
+                    return ParseImportStmt();
                 case TokenType.Export:
                 case TokenType.Const:
                 case TokenType.Type:
-                    return ParseType(); // <-- TODO
+                    return ParseType<Stmt>()!;
+                case TokenType.Object:
+                    return ParseObjectStmt();
                 case TokenType.Return:
                     return ParseReturnStmt();
+                case TokenType.Delete:
+                    return ParseDeleteStmt();
                 case TokenType.If:
                     return ParseIfElseStmt();
                 case TokenType.While:
                     return ParseWhileStmt();
                 case TokenType.For:
                     return ParseForStmt();
+                case TokenType.Identifier:
+                {
+                    if ((tokens[1].Type == TokenType.Const || tokens[1].Type == TokenType.Export || tokens[1].Type == TokenType.Identifier) && outline == 0)
+                    {
+                        return ParseType<Stmt>(true)!;
+                    }
+                    return ParseExpr();
+                }
                 default:
                     return ParseExpr();
             }
         }
 
-        private Stmt ParseType()
+        private Stmt ParseImportStmt()
+        {
+            Eat();
+
+            var target = new List<string>();
+            string? alias = null;
+
+            while (NotEOF() && At().Type != TokenType.Semicolon)
+            {
+                target.Add(Eat().Value);
+
+                if (At().Type == TokenType.Dot)
+                {
+                    Eat();
+                } else
+                {
+                    break;
+                }
+            }
+
+            if (At().Type == TokenType.As)
+            {
+                Eat();
+                alias = Expect(TokenType.Identifier, "Identifier expected after `as` keyword.").Value;
+            }
+
+            Expect(TokenType.Semicolon, "Semicolon expected after import statement.");
+            return new ImportStmt(target.ToArray(), alias);
+        }
+
+        /// <summary> T: ParseTypeContext | Types.Type | Stmt </summary>
+        private T? ParseType<T>(bool identifierType = false) where T : class
         {
             Token? type = null;
+            List<Token>? functionTypeListTk = null;
             bool constant = false;
             bool exported = false;
 
-            while (At().Type == TokenType.Type || At().Type == TokenType.Const || At().Type == TokenType.Export)
+            while (((!identifierType ? At().Type == TokenType.Type : At().Type == TokenType.Identifier) && type == null) || (At().Type == TokenType.Const && !constant) || (At().Type == TokenType.Export && !exported) || (At().Type == TokenType.Function && functionTypeListTk == null))
             {
-                if (At().Type == TokenType.Const && !constant)
+                if (At().Type == TokenType.Const)
                 {
                     constant = true;
                     Eat();
-                } else if (At().Type == TokenType.Type && type == null)
+                    continue;
+                } else if ((!identifierType ? At().Type == TokenType.Type : At().Type == TokenType.Identifier))
                 {
                     type = Eat();
                     if (At().Type == TokenType.OpenBracket) {
                         Eat();
                         Expect(TokenType.CloseBracket, "Closing bracket expected after open bracket in array declaration.");
-                        type = new Token(type.Value + "[]", type.Type);
+                        type = new Token(type.Value + "[]", TokenType.Type);
                     }
-                } else if (At().Type == TokenType.Export && !exported)
+                    continue;
+                } else if (At().Type == TokenType.Export)
                 {
+                    Eat();
                     exported = true;
+                    continue;
+                } else if (At().Type == TokenType.Function)
+                {
+                    Eat();
+                    functionTypeListTk = new();
+
+                    outline++;
+                    Expect(TokenType.OpenParen, "Open paren expected in lambda function declaration keyword.");
+
+                    if (At().Type == TokenType.CloseParen)
+                        continue;
+
+                    functionTypeListTk.Add(Expect(TokenType.Type, "Type expected in lambda function declaration keyword."));
+
+                    while (At().Type == TokenType.Comma && Eat() != null)
+                    {
+                        functionTypeListTk.Add(Expect(TokenType.Type, "Type expected in lambda function declaration keyword."));
+                    }
+
+                    Expect(TokenType.CloseParen, "Close paren expected in lambda function declaration keyword.");
+                    outline--;
+                    continue;
                 }
+
+                break;
             }
 
             if (type == null)
                 ThrowSyntaxError("No declaration type specified.");
 
+            // Do lambda types
+            List<Types.Type> functionTypeList = new();
+            if (functionTypeListTk != null)
+            {
+                foreach (var item in functionTypeListTk)
+                    functionTypeList.Add(Types.FromString(item.Value) ?? Types.Type.Void());
+            }
+
+            // If the requested is only a type
+            if (typeof(T) == typeof(Types.Type))
+            {
+                return ((T)(object)Types.FromString(type!.Value)?.CopyWith(lambdaTypes: functionTypeList.ToArray())!);
+            } else if (typeof(T) == typeof(ParseTypeContext))
+            {
+                return ((T)(object)new ParseTypeContext(Types.FromString(type!.Value)?.CopyWith(lambdaTypes: functionTypeList.ToArray())!, constant, exported));
+            } else if (typeof(T) != typeof(Stmt))
+            {
+                ThrowSyntaxError("Internal Error: Cannot use anything else than ( ParseTypeContext | Types.Type | Stmt ) as a generic type parameter for the `ParseType` method.");
+            }
+
+
+            // Get identifier
             var identifier = Expect(TokenType.Identifier, "Expected identifier after type.");
 
-            // Function
+            ///var finalType = (T)(object)Types.FromString(type!.Value)?.CopyWith(lambdaTypes: functionTypeList.ToArray())!;
+
+            // Return: Function
             if (At().Type == TokenType.OpenParen)
             {
                 if (constant) ThrowSyntaxError("Functions cannot be declared constant.");
-                return ParseFnDeclaration(type!, identifier);
+                return (T)(object)ParseFnDeclaration(type!, identifier, functionTypeList, exported);
             }
 
-            return ParseVarDeclaration(type!, identifier, constant);
+            // Return: Variable
+            return (T)(object)ParseVarDeclaration(type!, identifier, functionTypeList, constant, exported);
         }
 
-        private Stmt ParseFnDeclaration(Token type, Token name)
+        private Stmt ParseFnDeclaration(Token type, Token name, List<Types.Type> lambdaFnTypelist, bool exposed)
         {
             //Eat(); // eat the fn keyword
             //var name = Expect(TokenType.Identifier, "Expected function name following func keyword.").Value;
@@ -140,17 +254,25 @@ namespace JScr.Frontend
                 }
             }
 
-            Expect(TokenType.OpenBrace, "Expected function body following declaration.");
             var body = new List<Stmt>();
-
-            while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+            var instaret = false;
+            if (At().Type == TokenType.OpenBrace)
             {
+                Eat();
+                while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+                {
+                    body.Add(ParseStmt());
+                }
+                Expect(TokenType.CloseBrace, "Closing brace expected inside function declaration.");
+            } else
+            {
+                instaret = true;
+                Expect(TokenType.Equals, "Lambda arrow expected: Equals");
+                Expect(TokenType.MoreThan, "Lambda arrow expected: MoreThan");
                 body.Add(ParseStmt());
             }
 
-            Expect(TokenType.CloseBrace, "Closing brace expected inside function declaration.");
-            var fn = new FunctionDeclaration(args.ToArray(), name.Value, Types.FromString(type.Value), body.ToArray());
-
+            var fn = new FunctionDeclaration(exposed, args.ToArray(), name.Value, Types.FromString(type.Value)?.CopyWith(lambdaTypes: lambdaFnTypelist.ToArray()), body.ToArray(), instaret);
             return fn;
         }
 
@@ -158,9 +280,9 @@ namespace JScr.Frontend
         {
             outline++;
 
-            Expect(TokenType.OpenParen, "Expected open parenthesis.");
+            Expect(TokenType.OpenParen, "Expected open parenthesis inside declarative arguments list.");
             var args = At().Type == TokenType.CloseParen ? new List<VarDeclaration>() : ParseDeclarativeArgsList();
-            Expect(TokenType.CloseParen, "Expected closing parenthesis inside arguments list.");
+            Expect(TokenType.CloseParen, "Expected closing parenthesis inside declarative arguments list.");
 
             outline--;
             return args;
@@ -168,45 +290,109 @@ namespace JScr.Frontend
 
         private List<VarDeclaration> ParseDeclarativeArgsList()
         {
-            VarDeclaration ParseCustomParameterVDecl()
+            VarDeclaration ParseParamVar()
             {
-                var type = Expect(TokenType.Type, "Type expected inside declarative arguments list.");
-                var ident = Expect(TokenType.Identifier, "Identifier expected after type inside declarative arguments list.");
+                var stmt = ParseType<Stmt>();
 
-                return new VarDeclaration(false, Types.FromString(type.Value), ident.Value, null);
+                if (stmt!.Kind != NodeType.VarDeclaration)
+                    ThrowSyntaxError("Variable declaration expected inside declarative parameters list.");
+
+                return stmt as VarDeclaration;
             }
 
-            var args = new List<VarDeclaration>(){ ParseCustomParameterVDecl() };
+            var args = new List<VarDeclaration>(){ ParseParamVar() };
 
             while (At().Type == TokenType.Comma && Eat() != null)
             {
-                args.Add(ParseCustomParameterVDecl());
+                args.Add(ParseParamVar());
             }
 
             return args;
         }
 
-        private Stmt ParseVarDeclaration(Token type, Token name, bool constant)
+        private Stmt ParseVarDeclaration(Token type, Token name, List<Types.Type> lambdaFnTypelist, bool constant, bool exposed)
         {
             //var isConstant = Eat().Type == TokenType.Const;
             //var identifier = Expect(TokenType.Identifier, "Expected identifier name following let | const keywords.").Value;
 
-            if (At().Type == TokenType.Semicolon)
+            VarDeclaration MkNoval()
             {
-                Eat(); // expect semicolon
                 if (constant)
                     ThrowSyntaxError("Must assign value to constant expression. No value provided.");
 
-                return new VarDeclaration(false, Types.FromString(type.Value), name.Value, null);
+                return new VarDeclaration(false, exposed, Types.FromString(type.Value), name.Value, null);
             }
 
-            Expect(TokenType.Equals, "Expected equals token following identifier in var declaration.");
+            if (outline == 0 && At().Type == TokenType.Semicolon)
+            {
+                Eat(); // eat semicolon
+                return MkNoval();
+            } else if (outline > 0 && At().Type != TokenType.Equals)
+            {
+                return MkNoval();
+            }
+
+            VarDeclaration declaration;
+            var valType = Types.FromString(type.Value)?.CopyWith(lambdaTypes: lambdaFnTypelist.ToArray());
             outline++;
-            var declaration = new VarDeclaration(constant, Types.FromString(type.Value), name.Value, ParseExpr());
+            if (At().Type == TokenType.Equals)
+            {
+                Eat(); // Advance past equal
+                declaration = new VarDeclaration(constant, exposed, valType, name.Value, ParseExpr());
+            } else
+            {
+                declaration = new VarDeclaration(constant, exposed, valType, name.Value, ParseObjectConstructorExpr(valType ?? Types.Type.Void(), true));
+            }
             if (outline <= 1) Expect(TokenType.Semicolon, "Outline variable declaration statement must end with semicolon.");
             outline--;
 
             return declaration;
+        }
+
+        private Stmt ParseObjectStmt()
+        {
+            Eat();
+            var name = Expect(TokenType.Identifier, "Object identifier expected.");
+            Expect(TokenType.OpenBrace, "Open brace expected in object declaration.");
+
+            var objectProperties = new List<Property>();
+            bool export = false;
+            outline++;
+            while (NotEOF() && At().Type != TokenType.CloseBrace)
+            {
+                var type = ParseType<ParseTypeContext>();
+                var key = Expect(TokenType.Identifier, "Object literal key expected.").Value;
+
+                export = type!.Exported;
+
+                // Allows shorthand key: pair -> { key, }.
+                if (At().Type == TokenType.Comma)
+                {
+                    Eat(); // advance past comma
+                    objectProperties.Add(new Property(key, type?.Type, null));
+                    continue;
+                }
+                // Allows shorthand key: pair -> { key }.
+                else if (At().Type == TokenType.CloseBrace)
+                {
+                    objectProperties.Add(new Property(key, type?.Type, null));
+                    continue;
+                }
+
+                // { key: val }
+                Expect(TokenType.Colon, "Missing colon following identifier in ObjectExpr.");
+                var value = ParseExpr();
+
+                objectProperties.Add(new Property(key, type?.Type, value));
+                if (At().Type != TokenType.CloseBrace)
+                {
+                    Expect(TokenType.Comma, "Expected comma or closing bracket following property.");
+                }
+            }
+            outline--;
+
+            Expect(TokenType.CloseBrace, "Object declaration missing closing brace.");
+            return new ObjectDeclaration(export, name.Value, objectProperties.ToArray());
         }
 
         private Stmt ParseReturnStmt()
@@ -216,6 +402,18 @@ namespace JScr.Frontend
             outline++;
             var val = new ReturnDeclaration(ParseExpr());
             Expect(TokenType.Semicolon, "Return statement must end with semicolon.");
+            outline--;
+
+            return val;
+        }
+
+        private Stmt ParseDeleteStmt()
+        {
+            Eat();
+
+            outline++;
+            var val = new DeleteDeclaration(Expect(TokenType.Identifier, "Delete identifier expected.").Value);
+            Expect(TokenType.Semicolon, "Delete statement must end with semicolon.");
             outline--;
 
             return val;
@@ -364,7 +562,7 @@ namespace JScr.Frontend
 
         private Expr ParseAssignmentExpr()
         {
-            var left = ParseObjectArrayExpr();
+            var left = ParseArrayExpr();
 
             if (At().Type == TokenType.Equals)
             {
@@ -374,67 +572,133 @@ namespace JScr.Frontend
                 if (outline <= 1) Expect(TokenType.Semicolon, "Semicolon expected after outline assignment expr.");
                 outline--;
                 return new AssignmentExpr(left, value);
+            } else if (At().Type == TokenType.OpenBrace)
+            {
+                outline++;
+                var value = ParseObjectConstructorExpr(left);
+                if (outline <= 1) Expect(TokenType.Semicolon, "Semicolon expected after outline assignment expr.");
+                outline--;
+                return new AssignmentExpr(left, value);
             }
 
             return left;
         }
 
-        private Expr ParseObjectArrayExpr()
+        private Expr ParseObjectConstructorExpr(dynamic targetVariableIdentifier, bool tviAsType = false)
+        {
+            if (!tviAsType && targetVariableIdentifier is not Identifier)
+            {
+                ThrowSyntaxError("Object constructor assignment only works for identifiers.");
+            }
+
+            Expect(TokenType.OpenBrace, "Open brace expected in object constructor.");
+
+            var objectProperties = new List<Property>();
+            while (NotEOF() && At().Type != TokenType.CloseBrace)
+            {
+                var key = Expect(TokenType.Identifier, "Object constructor key expected.").Value;
+
+                // { key: val }
+                Expect(TokenType.Colon, "Missing colon following identifier in ObjectConstructorExpr.");
+                var value = ParseExpr();
+
+                objectProperties.Add(new Property(key, null, value));
+                if (At().Type != TokenType.CloseBrace)
+                {
+                    Expect(TokenType.Comma, "Expected comma or closing bracket following property.");
+                }
+            }
+
+            Expect(TokenType.CloseBrace, "Object constructor missing closing brace.");
+            return new ObjectConstructorExpr(targetVariableIdentifier, tviAsType, objectProperties.ToArray());
+        }
+
+        private Expr ParseArrayExpr()
         {
             if (At().Type != TokenType.OpenBrace)
             {
-                return ParseBoolExpr();
+                return ParseLambdaFuncExpr();
             }
 
             Eat(); // advance past open brace
-            bool isArray = false;
-            var objectProperties = new List<Property>();
             var arrayElements = new List<Expr>();
 
             while (NotEOF() && At().Type != TokenType.CloseBrace)
             {
-                if (At().Type == TokenType.Type)
+                var value = ParseExpr();
+                arrayElements.Add(value);
+                if (At().Type != TokenType.CloseBrace)
                 {
-                    var type = Eat();
-                    var key = Expect(TokenType.Identifier, "Object literal key expected.").Value;
-
-                    // Allows shorthand key: pair -> { key, }.
-                    if (At().Type == TokenType.Comma)
-                    {
-                        Eat(); // advance past comma
-                        objectProperties.Add(new Property(key, Types.FromString(type.Value), null));
-                        continue;
-                    }
-                    // Allows shorthand key: pair -> { key }.
-                    else if (At().Type == TokenType.CloseBrace)
-                    {
-                        objectProperties.Add(new Property(key, Types.FromString(type.Value), null));
-                        continue;
-                    }
-
-                    // { key: val }
-                    Expect(TokenType.Colon, "Missing colon following identifier in ObjectExpr.");
-                    var value = ParseExpr();
-
-                    objectProperties.Add(new Property(key, Types.FromString(type.Value), value));
-                    if (At().Type != TokenType.CloseBrace)
-                    {
-                        Expect(TokenType.Comma, "Expected comma or closing bracket following property.");
-                    }
-                } else
-                {
-                    isArray = true;
-                    var value = ParseExpr();
-                    arrayElements.Add(value);
-                    if (At().Type != TokenType.CloseBrace)
-                    {
-                        Expect(TokenType.Comma, "Expected comma or closing bracket following array element.");
-                    }
+                    Expect(TokenType.Comma, "Expected comma or closing bracket following array element.");
                 }
             }
 
-            Expect(TokenType.CloseBrace, !isArray ? "Object literal missing closing brace." : "Array literal missing closing brace.");
-            return !isArray ? new ObjectLiteral(objectProperties.ToArray()) : new ArrayLiteral(arrayElements.ToArray());
+            Expect(TokenType.CloseBrace, "Array literal missing closing brace.");
+            return new ArrayLiteral(arrayElements.ToArray());
+        }
+
+        private Expr ParseLambdaFuncExpr()
+        {
+            if (At().Type != TokenType.Lambda)
+            {
+                return ParseBoolExpr();
+            }
+
+            List<Identifier> ParseIdentList()
+            {
+                List<Identifier> list = new();
+
+                void Add(Expr e)
+                {
+                    if (e.Kind != NodeType.Identifier)
+                    {
+                        ThrowSyntaxError("Identifier required as a param in lambda expression.");
+                    }
+
+                    list.Add(e as Identifier);
+                }
+
+                outline++;
+                Eat();
+                Expect(TokenType.OpenParen, "Open paren expected in lambda expression.");
+                if (At().Type == TokenType.CloseParen)
+                    return list;
+
+                Add(ParsePrimaryExpr());
+
+                while (At().Type == TokenType.Comma && Eat() != null)
+                {
+                    Add(ParsePrimaryExpr());
+                }
+
+                Expect(TokenType.CloseParen, "Close paren expected in lambda expression.");
+                outline--;
+
+                return list;
+            }
+
+            var identList = ParseIdentList();
+            var body = new List<Stmt>();
+            var instaret = false;
+            if (At().Type == TokenType.OpenBrace)
+            {
+                outline--;
+                Eat();
+                while (At().Type != TokenType.EOF && At().Type != TokenType.CloseBrace)
+                {
+                    body.Add(ParseStmt());
+                }
+                Expect(TokenType.CloseBrace, "Closing brace expected inside lambda declaration.");
+                outline++;
+            } else
+            {
+                instaret = true;
+                Expect(TokenType.Equals, "Lambda arrow expected: Equals");
+                Expect(TokenType.MoreThan, "Lambda arrow expected: MoreThan");
+                body.Add(ParseStmt());
+            }
+
+            return new LambdaExpr(identList.ToArray(), body.ToArray(), instaret);
         }
 
         private Expr ParseBoolExpr()
@@ -522,9 +786,28 @@ namespace JScr.Frontend
             if (At().Type == TokenType.OpenParen)
             {
                 return ParseCallExpr(member);
+            } else if (At().Type == TokenType.OpenBracket)
+            {
+                return ParseIndexExpr(member);
             }
 
             return member;
+        }
+
+        private Expr ParseIndexExpr(Expr caller)
+        {
+            outline++;
+            Expect(TokenType.OpenBracket, "Open bracket expected inside index expression.");
+            Expr callExpr = new IndexExpr(ParseExpr(), caller);
+            Expect(TokenType.CloseBracket, "Closing bracket expected inside index expression.");
+            outline--;
+
+            if (At().Type == TokenType.OpenBracket)
+            {
+                callExpr = ParseIndexExpr(callExpr);
+            }
+
+            return callExpr;
         }
 
         private Expr ParseCallExpr(Expr caller)
@@ -547,7 +830,7 @@ namespace JScr.Frontend
         {
             outline++;
 
-            Expect(TokenType.OpenParen, "Expected open parenthesis.");
+            Expect(TokenType.OpenParen, "Expected open parenthesis inside arguments list.");
             var args = At().Type == TokenType.CloseParen ? new List<Expr>() : ParseArgumentsList();
 
             Expect(TokenType.CloseParen, "Expected closing parenthesis inside arguments list.");
@@ -580,13 +863,8 @@ namespace JScr.Frontend
 
                 // get identifier
                 property = ParsePrimaryExpr();
-
-                if (property.Kind != NodeType.Identifier)
-                {
-                    ThrowSyntaxError("Cannot use dot operator without right hand side being an identifier.");
-                }
                 
-                object_ = new MemberExpr(object_, property as Identifier);
+                object_ = new MemberExpr(object_, property);
             }
 
             return object_;
@@ -599,7 +877,9 @@ namespace JScr.Frontend
             switch (tk)
             {
                 case TokenType.Identifier:
+                {
                     return new Identifier(Eat().Value);
+                }
                 case TokenType.Number:
                     return new NumericLiteral(int.Parse(Eat().Value));
                 case TokenType.String:

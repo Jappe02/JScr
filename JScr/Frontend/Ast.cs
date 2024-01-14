@@ -10,9 +10,12 @@ namespace JScr.Frontend
         {
             // STATEMENTS
             Program,
+            ImportStmt,
             VarDeclaration,
             FunctionDeclaration,
+            ObjectDeclaration,
             ReturnDeclaration,
+            DeleteDeclaration,
             IfElseDeclaration,
             WhileDeclaration,
             ForDeclaration,
@@ -21,11 +24,13 @@ namespace JScr.Frontend
             AssignmentExpr,
             EqualityCheckExpr,
             MemberExpr,
+            LambdaExpr,
             CallExpr,
+            IndexExpr,
+            ObjectConstructorExpr,
 
             // LITERALS
             Property,
-            ObjectLiteral,
             ArrayLiteral,
             NumericLiteral,
             StringLiteral,
@@ -43,22 +48,37 @@ namespace JScr.Frontend
 
         public class Program : Stmt
         {
+            public string FileDir { get; }
             public List<Stmt> Body { get; }
 
-            public Program(List<Stmt> body) : base(NodeType.Program) { Body = body; }
+            public Program(string fileDir, List<Stmt> body) : base(NodeType.Program) { FileDir = fileDir; Body = body; }
+        }
+
+        public class ImportStmt : Stmt
+        {
+            public string[] Target { get; }
+            public string? Alias { get; }
+
+            public ImportStmt(string[] target, string? alias) : base(NodeType.ImportStmt)
+            {
+                Target = target;
+                Alias = alias;
+            }
         }
 
         public class VarDeclaration : Stmt
         {
             public bool Constant { get; }
+            public bool Export { get; }
             public Types.Type Type { get; }
             public string Identifier { get; }
             public Expr? Value { get; }
 
-            public VarDeclaration(bool constant, Types.Type? type, string identifier, Expr? value) : base(NodeType.VarDeclaration)
+            public VarDeclaration(bool constant, bool export, Types.Type? type, string identifier, Expr? value) : base(NodeType.VarDeclaration)
             {
                 Constant = constant;
-                Type = type ?? Types.Type.Void;
+                Export = export;
+                Type = type ?? Types.Type.Void();
                 Identifier = identifier;
                 Value = value;
             }
@@ -66,18 +86,36 @@ namespace JScr.Frontend
 
         public class FunctionDeclaration : Stmt
         {
+            public bool Export { get; }
             public VarDeclaration[] Parameters { get; }
             public string Name { get; }
             public Types.Type Type { get; }
             public Stmt[] Body { get; }
+            public bool InstantReturn { get; }
 
-            public FunctionDeclaration(VarDeclaration[] parameters, string name, Types.Type? type, Stmt[] body) : base(NodeType.FunctionDeclaration)
+            public FunctionDeclaration(bool export, VarDeclaration[] parameters, string name, Types.Type? type, Stmt[] body, bool instantReturn) : base(NodeType.FunctionDeclaration)
             {
+                Export = export;
                 Parameters = parameters;
                 Name = name;
-                Type = type ?? Types.Type.Void;
+                Type = type ?? Types.Type.Void();
                 Body = body;
+                InstantReturn = instantReturn;
                 // TODO: Important keywords like `async` etc.
+            }
+        }
+
+        public class ObjectDeclaration : Stmt
+        {
+            public bool Export { get; }
+            public string Name { get; }
+            public Property[] Properties { get; }
+
+            public ObjectDeclaration(bool export, string name, Property[] properties) : base(NodeType.ObjectDeclaration)
+            {
+                Export = export;
+                Name = name;
+                Properties = properties;
             }
         }
 
@@ -86,6 +124,16 @@ namespace JScr.Frontend
             public Expr Value { get; }
 
             public ReturnDeclaration(Expr value) : base(NodeType.ReturnDeclaration)
+            {
+                Value = value;
+            }
+        }
+
+        public class DeleteDeclaration : Stmt
+        {
+            public string Value { get; }
+
+            public DeleteDeclaration(string value) : base(NodeType.DeleteDeclaration)
             {
                 Value = value;
             }
@@ -204,15 +252,55 @@ namespace JScr.Frontend
             }
         }
 
+        public class IndexExpr : Expr
+        {
+            public Expr Arg { get; }
+            public Expr Caller { get; }
+
+            public IndexExpr(Expr arg, Expr calle) : base(NodeType.IndexExpr)
+            {
+                Caller = calle;
+                Arg = arg;
+            }
+        }
+
+        public class ObjectConstructorExpr : Expr
+        {
+            public dynamic TargetVariableIdent { get; }
+            public bool TargetVarIdentAsType { get; }
+            public Property[] Properties { get; }
+
+            public ObjectConstructorExpr(dynamic targetVariableIdent, bool targetVarIdentAsType, Property[] properties) : base(NodeType.ObjectConstructorExpr)
+            {
+                TargetVariableIdent = targetVariableIdent;
+                TargetVarIdentAsType = targetVarIdentAsType;
+                Properties = properties;
+            }
+        }
+
         public class MemberExpr : Expr
         {
             public Expr Object { get; }
-            public Identifier Property { get; }
+            public Expr Property { get; }
 
-            public MemberExpr(Expr object_, Identifier property) : base(NodeType.MemberExpr)
+            public MemberExpr(Expr object_, Expr property) : base(NodeType.MemberExpr)
             {
                 Object = object_;
                 Property = property;
+            }
+        }
+
+        public class LambdaExpr : Expr
+        {
+            public Identifier[] ParamIdents { get; }
+            public Stmt[] Body { get; }
+            public bool InstantReturn { get; }
+
+            public LambdaExpr(Identifier[] paramIdents, Stmt[] body, bool instantReturn) : base(NodeType.LambdaExpr)
+            {
+                ParamIdents = paramIdents;
+                Body = body;
+                InstantReturn = instantReturn;
             }
         }
 
@@ -259,16 +347,9 @@ namespace JScr.Frontend
 
             public Property(string key, Types.Type? type, Expr? value) : base(NodeType.Property) {
                 Key = key;
-                Type = type ?? Types.Type.Void;
+                Type = type ?? Types.Type.Void();
                 Value = value;
             }
-        }
-
-        public class ObjectLiteral : Expr
-        {
-            public Property[] Properties { get; }
-
-            public ObjectLiteral(Property[] properties) : base(NodeType.ObjectLiteral) { Properties = properties; }
         }
     }
 }

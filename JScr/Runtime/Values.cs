@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using Newtonsoft.Json;
+using System.Text.Json;
 using static JScr.Frontend.Ast;
 
 namespace JScr.Runtime
@@ -14,19 +15,22 @@ namespace JScr.Runtime
             char_,
             boolean,
             object_,
+            objectInstance,
             function,
             nativeFn,
+            lambdaFn,
         }
 
         public abstract class RuntimeVal
         {
+            [JsonIgnore]
             public ValueType Type { get; }
 
             public RuntimeVal(ValueType type) { Type = type; }
 
             public override string ToString()
             {
-                return "RuntimeVal";
+                return "<unspecified_value>";
             }
         }
 
@@ -89,22 +93,35 @@ namespace JScr.Runtime
             public class Property
             {
                 public string Key { get; }
+                [JsonIgnore]
                 public Types.Type Type { get; }
                 public RuntimeVal Value { get; }
 
                 public Property(string key, Types.Type? type, RuntimeVal value)
                 {
                     Key = key;
-                    Type = type ?? Types.Type.Void;
+                    Type = type ?? Types.Type.Void();
                     Value = value;
                 }
 
                 public override string ToString() => this.ToJson();
             }
 
+            public bool Export { get; }
+            public string Name { get; }
             public List<Property> Properties { get; }
 
-            public ObjectVal(List<Property> properties) : base(ValueType.object_) { Properties = properties; }
+            public ObjectVal(bool export, string name, List<Property> properties) : base(ValueType.object_) { Export = export; Name = name; Properties = properties; }
+
+            public override string ToString() => Properties.ToJson();
+        }
+
+        public class ObjectInstanceVal : RuntimeVal
+        {
+            public string ObjType { get; }
+            public List<ObjectVal.Property> Properties { get; }
+
+            public ObjectInstanceVal(string objType, List<ObjectVal.Property> properties) : base(ValueType.objectInstance) { ObjType = objType; Properties = properties; }
 
             public override string ToString() => Properties.ToJson();
         }
@@ -118,27 +135,29 @@ namespace JScr.Runtime
 
             public NativeFnVal(Types.Type type, FunctionCall call) : base(ValueType.nativeFn) { Type_ = type; Call = call; }
 
-            public override string ToString() => Call.ToString() ?? "NativeFnVal";
+            public override string ToString() => "<native_closure>";
         }
 
         public class FunctionVal : RuntimeVal
         {
-            public string Name { get; }
+            public string? Name { get; }
             public Types.Type Type_ { get; }
             public VarDeclaration[] Parameters { get; }
             public Environment DeclarationEnv { get; }
             public Stmt[] Body { get; }
+            public bool InstantReturn { get; }
 
-            public FunctionVal(string name, Types.Type type, VarDeclaration[] parameters, Environment declarationEnv, Stmt[] body) : base(ValueType.function)
+            public FunctionVal(string? name, Types.Type type, VarDeclaration[] parameters, Environment declarationEnv, Stmt[] body, bool instantReturn) : base(ValueType.function)
             {
-                Name = name;
+                Name = name?.Trim() == "" ? null : name;
                 Type_ = type;
                 Parameters = parameters;
                 DeclarationEnv = declarationEnv;
                 Body = body;
+                InstantReturn = instantReturn;
             }
 
-            public override string ToString() => this.ToJson();
+            public override string ToString() => Name == null ? "<anonymous_closure>" : Name;
         }
     }
 }

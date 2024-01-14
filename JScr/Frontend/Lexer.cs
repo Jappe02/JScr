@@ -18,7 +18,7 @@ namespace JScr.Frontend
             Identifier,
 
             // Keywords
-            Const, Export, Return, If, Else, While, For,
+            Function, Lambda, Const, Export, Return, If, Else, While, For, Object, Delete, Import, As,
 
             // Gruping * Operators
             BinaryOperator,
@@ -42,6 +42,12 @@ namespace JScr.Frontend
             { "else", TokenType.Else},
             { "while", TokenType.While},
             { "for", TokenType.For},
+            { "function", TokenType.Function},
+            { "lambda", TokenType.Lambda},
+            { "object", TokenType.Object},
+            { "delete", TokenType.Delete},
+            { "import", TokenType.Import},
+            { "as", TokenType.As},
         };
 
         public class Token

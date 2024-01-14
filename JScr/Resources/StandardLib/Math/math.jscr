@@ -1,5 +1,3 @@
-namespace Math;
-
-public int abs(int a) {
-    // TODO: Abs
+export int abs(int a) {
+    print("Coming soon!");
 }

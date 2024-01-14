@@ -1,5 +1,6 @@
 ﻿using JScr.Frontend;
 using JScr.Runtime;
+using JScr.StandardLib;
 
 namespace JScr
 {
@@ -41,7 +42,6 @@ namespace JScr
         private bool isRunning = false;
 
         private Script() { }
-        ~Script() { End(); }
 
         /// <summary>
         /// Create a script from file, a script file should be the full directory with a file name
@@ -57,6 +57,8 @@ namespace JScr
 
             script.FileDir = filedir;
             script.resources = externalResources ?? new List<JScrExternalResource>();
+
+            script.resources.Add(new JScrExternalResourceFile(new[] { "jscr", "math" }, ResourceHandler.GetStandardLibResource("Math.math.jscr")));
 
             try
             {
@@ -86,17 +88,10 @@ namespace JScr
 
             isRunning = true;
             if (anotherThread)
-                await Task.Run(() => Interpreter.EvaluateProgram(program, ref isRunning));
+                await Task.Run(() => Interpreter.EvaluateProgram(program, resources.ToArray()));
             else
-                Interpreter.EvaluateProgram(program, ref isRunning);
+                Interpreter.EvaluateProgram(program, resources.ToArray());
 
-            End();
-        }
-
-        /// <summary>
-        /// End the execution of this script.
-        /// </summary>
-        public void End() {
             isRunning = false;
         }
     }
@@ -130,10 +125,12 @@ namespace JScr
         // TODO: LOAD STANDARD LIBRARY FILES USING RESX OR SOMETHING. (need to be files embedded in this .dll).
         //
 
-        private string internalFile;
+        internal string[] location;
+        internal string internalFile;
 
-        public JScrExternalResourceFile(string internalFile)
+        public JScrExternalResourceFile(string[] location, string internalFile)
         {
+            this.location = location;
             this.internalFile = internalFile;
         }
     }
