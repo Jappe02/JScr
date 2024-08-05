@@ -11,10 +11,14 @@ namespace JScr.Runtime
             null_,
             array,
             integer,
+            float_,
+            double_,
             string_,
             char_,
             boolean,
             object_,
+            enum_,
+            class_,
             objectInstance,
             function,
             nativeFn,
@@ -70,6 +74,24 @@ namespace JScr.Runtime
             public override string ToString() => Value.ToString();
         }
 
+        public class FloatVal : RuntimeVal
+        {
+            public float Value { get; }
+
+            public FloatVal(float value = 0) : base(ValueType.float_) { Value = value; }
+
+            public override string ToString() => Value.ToString();
+        }
+
+        public class DoubleVal : RuntimeVal
+        {
+            public double Value { get; }
+
+            public DoubleVal(double value = 0) : base(ValueType.double_) { Value = value; }
+
+            public override string ToString() => Value.ToString();
+        }
+
         public class StringVal : RuntimeVal
         {
             public string Value { get; }
@@ -107,13 +129,45 @@ namespace JScr.Runtime
                 public override string ToString() => this.ToJson();
             }
 
-            public bool Export { get; }
+            public Visibility Visibility { get; }
             public string Name { get; }
             public List<Property> Properties { get; }
 
-            public ObjectVal(bool export, string name, List<Property> properties) : base(ValueType.object_) { Export = export; Name = name; Properties = properties; }
+            public ArrayVal? AnnotationTargets { get; }
+            public bool IsAnnotation => AnnotationTargets != null;
+
+            public ObjectVal(Visibility visibility, string name, List<Property> properties, ArrayVal? annotationTargets = null) : base(ValueType.object_)
+            {
+                Visibility = visibility;
+                Name = name;
+                Properties = properties;
+                AnnotationTargets = annotationTargets;
+            }
 
             public override string ToString() => Properties.ToJson();
+        }
+
+        public class ClassVal : RuntimeVal
+        {
+            public Visibility Visibility { get; }
+            public string Name { get; }
+            public ClassVal[] Derivants { get; }
+            public Stmt[] Body { get; }
+
+            public ClassVal(Visibility visibility, string name, ClassVal[] derivants, Stmt[] body) : base(ValueType.class_) { Visibility = visibility; Name = name; Derivants = derivants; Body = body; }
+
+            public override string ToString() => Name.ToJson();
+        }
+
+        public class EnumVal : RuntimeVal
+        {
+            public Visibility Visibility { get; }
+            public string Name { get; }
+            public Dictionary<string, ushort> Entries { get; }
+
+            public EnumVal(Visibility visibility, string name, Dictionary<string, ushort> entries) : base(ValueType.enum_) { Visibility = visibility; Name = name; Entries = entries; }
+
+            public override string ToString() => Entries.ToJson();
         }
 
         public class ObjectInstanceVal : RuntimeVal

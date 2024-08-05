@@ -1,7 +1,4 @@
-﻿using System.Linq;
-using System.Text.Json;
-using static JScr.Runtime.Types;
-using static JScr.Runtime.Values;
+﻿using JScr.Typing;
 
 namespace JScr.Frontend
 {
@@ -9,24 +6,42 @@ namespace JScr.Frontend
     {
         public enum TokenType
         {
-            Type,
-
             // Literal Types
             Number,
+            FloatNumber,
+            DoubleNumber,
             String,
             Char,
             Identifier,
 
             // Keywords
-            Function, Lambda, Const, Export, Return, If, Else, While, For, Object, Delete, Import, As,
+            Const,
+            Private, Protected, Public,
+            Abstract, Virtual, Override,
+            Return,
+            If, Else, While, For,
+            Struct, Enum, Class,
+            New, Delete,
+            Namespace, Import, As,
 
             // Gruping * Operators
             BinaryOperator,
             LessThan, MoreThan,
-            And, Or,
+            LogicalAnd,
+            LogicalOr,
+            BitwiseAnd,
+            BitwiseOr,
+            BitwiseXor,
+            BitwiseOnesComplement,
+            BitwiseShiftLeft,
+            BitwiseShiftRight,
             Not,
+            NotEquals,
             Equals,
-            Comma, Colon, Dot,
+            Assignment,
+            PtrMemberAccess,
+            LambdaArrow,
+            Comma, Colon, DoubleColon, Dot, At, Discard,
             Semicolon,
             OpenParen /*(*/, CloseParen /*)*/,
             OpenBrace /*{*/, CloseBrace /*}*/,
@@ -35,19 +50,26 @@ namespace JScr.Frontend
         }
 
         static readonly Dictionary<string, TokenType> KEYWORDS = new() {
-            { "const", TokenType.Const},
-            { "export", TokenType.Export},
-            { "return", TokenType.Return},
-            { "if", TokenType.If},
-            { "else", TokenType.Else},
-            { "while", TokenType.While},
-            { "for", TokenType.For},
-            { "function", TokenType.Function},
-            { "lambda", TokenType.Lambda},
-            { "object", TokenType.Object},
-            { "delete", TokenType.Delete},
-            { "import", TokenType.Import},
-            { "as", TokenType.As},
+            { "const", TokenType.Const },
+            { "priv", TokenType.Private },
+            { "prot", TokenType.Protected },
+            { "pub", TokenType.Public },
+            { "abst", TokenType.Abstract },
+            { "virt", TokenType.Virtual },
+            { "ovr", TokenType.Override },
+            { "return", TokenType.Return },
+            { "if", TokenType.If },
+            { "else", TokenType.Else },
+            { "while", TokenType.While },
+            { "for", TokenType.For },
+            { "struct", TokenType.Struct },
+            { "enum", TokenType.Enum },
+            { "class", TokenType.Class },
+            { "new", TokenType.New },
+            { "delete", TokenType.Delete },
+            { "space", TokenType.Namespace },
+            { "use", TokenType.Import },
+            { "as", TokenType.As },
         };
 
         public class Token
@@ -68,7 +90,7 @@ namespace JScr.Frontend
             }
         }
 
-        static bool IsAlpha(char src) => src.ToString().ToUpper() != src.ToString().ToLower();
+        static bool IsAlpha(char src) => src.ToString().ToUpper() != src.ToString().ToLower() || src == '_' || src == '$';
 
         static bool IsSkippable(char src) => src == ' ' || src == '\n' || src == '\t' || src == '\r';
 
@@ -79,7 +101,7 @@ namespace JScr.Frontend
             return c >= bounds[0] && c <= bounds[1];
         }
 
-        public static Dictionary<Token, uint[]> Tokenize(string filedir, string text)
+        public static Dictionary<Token, uint[]> Tokenize(string filedir, string text, Action<SyntaxError> errorCallback)
         {
             var tokens = new Dictionary<Token, uint[]>();
             var src = text.ToCharArray().ToList();
@@ -141,23 +163,45 @@ namespace JScr.Frontend
             // Build each token until end of file.
             while (src.Count > 0)
             {
+                while (CommentModifier() || insideComment)
+                {
+                    if (src.ElementAtOrDefault(0) == '\n')
+                    {
+                        line++; col = 0;
+
+                        if (insideComment && !insideCommentMultiline)
+                            insideComment = false;
+                    }
+
+                    if (insideComment)
+                        Shift();
+                }
+
+                if (src.Count == 0)
+                    break;
+
                 // BEGIN PARSING ONE CHARACTER TOKENS
                 if (src[0] == '(')
                 {
                     Push(new Token(Shift(), TokenType.OpenParen));
-                } else if (src[0] == ')')
+                }
+                else if (src[0] == ')')
                 {
                     Push(new Token(Shift(), TokenType.CloseParen));
-                } else if (src[0] == '{')
+                }
+                else if (src[0] == '{')
                 {
                     Push(new Token(Shift(), TokenType.OpenBrace));
-                } else if (src[0] == '}')
+                }
+                else if (src[0] == '}')
                 {
                     Push(new Token(Shift(), TokenType.CloseBrace));
-                } else if (src[0] == '[')
+                }
+                else if (src[0] == '[')
                 {
                     Push(new Token(Shift(), TokenType.OpenBracket));
-                } else if (src[0] == ']')
+                }
+                else if (src[0] == ']')
                 {
                     Push(new Token(Shift(), TokenType.CloseBracket));
                 }
@@ -165,41 +209,107 @@ namespace JScr.Frontend
                 // HANDLE BINARY OPERATORS & COMMENTS
                 else if (src[0] == '+' || src[0] == '-' || src[0] == '*' || src[0] == '/' || src[0] == '%')
                 {
-                    if (!CommentModifier())
-                        Push(new Token(Shift(), TokenType.BinaryOperator));
+                    var tk = Shift();
+
+                    if (src[0] == '>' && tk == '-')
+                        Push(new Token(tk.ToString() + Shift(), TokenType.PtrMemberAccess));
+                    else
+                        Push(new Token(tk, TokenType.BinaryOperator));
                 }
 
-                // HANDLE CONDITIONAL & ASSIGNMENT TOKENS
+                // HANDLE CONDITIONAL, BITWISE & ASSIGNMENT TOKENS
                 else if (src[0] == '=')
                 {
-                    Push(new Token(Shift(), TokenType.Equals));
-                } else if (src[0] == ';')
+                    var tk = Shift();
+
+                    if (src[0] == '=')
+                        Push(new Token(tk.ToString() + Shift(), TokenType.Equals));
+                    else if (src[0] == '>')
+                        Push(new Token(tk.ToString() + Shift(), TokenType.LambdaArrow));
+                    else
+                        Push(new Token(tk, TokenType.Assignment));
+                }
+                else if (src[0] == ';')
                 {
                     Push(new Token(Shift(), TokenType.Semicolon));
-                } else if (src[0] == ':')
+                }
+                else if (src[0] == ':')
                 {
-                    Push(new Token(Shift(), TokenType.Colon));
-                } else if (src[0] == ',')
+                    var tk = Shift();
+
+                    if (src[0] == ':')
+                        Push(new Token(tk.ToString() + Shift(), TokenType.DoubleColon));
+                    else
+                        Push(new Token(tk, TokenType.Colon));
+                }
+                else if (src[0] == ',')
                 {
                     Push(new Token(Shift(), TokenType.Comma));
-                } else if (src[0] == '.')
+                } 
+                else if (src[0] == '.')
                 {
                     Push(new Token(Shift(), TokenType.Dot));
-                } else if (src[0] == '<')
+                } 
+                else if (src[0] == '@')
                 {
-                    Push(new Token(Shift(), TokenType.LessThan));
-                } else if (src[0] == '>')
+                    Push(new Token(Shift(), TokenType.At));
+                }
+                else if (src[0] == '^')
                 {
-                    Push(new Token(Shift(), TokenType.MoreThan));
-                } else if (src[0] == '&')
+                    Push(new Token(Shift(), TokenType.BitwiseXor));
+                }
+                else if (src[0] == '~')
                 {
-                    Push(new Token(Shift(), TokenType.And));
-                } else if (src[0] == '|')
+                    Push(new Token(Shift(), TokenType.BitwiseOnesComplement));
+                }
+                else if (src[0] == '_' && !IsAlpha(src[1]))
                 {
-                    Push(new Token(Shift(), TokenType.Or));
-                } else if (src[0] == '!')
+                    Push(new Token(Shift(), TokenType.Discard));
+                }
+                else if (src[0] == '<')
                 {
-                    Push(new Token(Shift(), TokenType.Not));
+                    var tk = Shift();
+
+                    if (src[0] == '>')
+                        Push(new Token(tk.ToString() + Shift(), TokenType.BitwiseShiftLeft));
+                    else
+                        Push(new Token(tk, TokenType.LessThan));
+                } 
+                else if (src[0] == '>')
+                {
+                    var tk = Shift();
+
+                    if (src[0] == '>')
+                        Push(new Token(tk.ToString() + Shift(), TokenType.BitwiseShiftRight));
+                    else
+                        Push(new Token(tk, TokenType.MoreThan));
+                } 
+                else if (src[0] == '&')
+                {
+                    var tk = Shift();
+
+                    if (src[0] == '&')
+                        Push(new Token(tk.ToString() + Shift(), TokenType.LogicalAnd));
+                    else
+                        Push(new Token(tk, TokenType.BitwiseAnd));
+                } 
+                else if (src[0] == '|')
+                {
+                    var tk = Shift();
+
+                    if (src[0] == '|')
+                        Push(new Token(tk.ToString() + Shift(), TokenType.LogicalOr));
+                    else
+                        Push(new Token(tk, TokenType.BitwiseOr));
+                } 
+                else if (src[0] == '!')
+                {
+                    var tk = Shift();
+
+                    if (src[0] == '=')
+                        Push(new Token(tk.ToString() + Shift(), TokenType.NotEquals));
+                    else
+                        Push(new Token(tk, TokenType.Not));
                 }
 
                 // HANDLE MULTICHARACTER KEYWORDS, TOKENS, IDENTIFIERS ETC...
@@ -209,16 +319,32 @@ namespace JScr.Frontend
                     if (IsInt(src[0]))
                     {
                         var num = "";
-                        while (src.Count > 0 && IsInt(src[0]))
+                        bool dot = false;
+                        while (src.Count > 0 && (IsInt(src[0]) || src[0] == '.'))
                         {
+                            if (dot && src[0] == '.') break;
+                            if (src[0] == '.') dot = true;
                             num += Shift();
                         }
 
-                        Push(new Token(num, TokenType.Number));
-                    } else if (IsAlpha(src[0]))
+                        if (char.ToUpper(src[0]) == char.ToUpper('d'))
+                        {
+                            Shift();
+                            Push(new Token(num, TokenType.DoubleNumber));
+                        } else if (char.ToUpper(src[0]) == char.ToUpper('f') || dot)
+                        {
+                            if (char.ToUpper(src[0]) == char.ToUpper('f'))
+                                Shift();
+                            Push(new Token(num, TokenType.FloatNumber));
+                        } else
+                        {
+                            Push(new Token(num, TokenType.Number));
+                        }
+                    }
+                    else if (IsAlpha(src[0]))
                     {
                         var ident = "";
-                        while (src.Count > 0 && IsAlpha(src[0]))
+                        while (src.Count > 0 && (IsAlpha(src[0]) || IsInt(src[0])))
                         {
                             ident += Shift();
                         }
@@ -226,16 +352,17 @@ namespace JScr.Frontend
                         // check for reserved keywords
                         TokenType? reserved = null;
                         if (KEYWORDS.TryGetValue(ident, out var keywordType)) reserved = keywordType;
-                        else if (reservedTypesDict.Values.Contains(ident)) reserved = TokenType.Type;
 
                         if (reserved != null)
                         {
                             Push(new Token(ident, (TokenType)reserved));
-                        } else
+                        }
+                        else
                         {
                             Push(new Token(ident, TokenType.Identifier));
                         }
-                    } else if (IsSkippable(src[0]))
+                    }
+                    else if (IsSkippable(src[0]))
                     {
                         if (src[0] == '\n') {
                             line++; col = 0;
@@ -245,7 +372,8 @@ namespace JScr.Frontend
                         }
 
                         Shift(); // SKIP THE CURRENT CHARACTER
-                    } else if (src[0] == '"') {
+                    }
+                    else if (src[0] == '"') {
                         Shift(); // < begin quote
                         var ident = "";
 
@@ -257,16 +385,18 @@ namespace JScr.Frontend
                         Shift(); // < end quote
 
                         Push(new Token(ident, TokenType.String));
-                    } else if (src[0] == '\'')
+                    }
+                    else if (src[0] == '\'')
                     {
                         Shift(); // < begin quote
                         char ident = Shift();
                         Shift(); // < end quote
 
                         Push(new Token(ident, TokenType.Char));
-                    } else
+                    }
+                    else
                     {
-                        throw new SyntaxException(new(filedir, line, col, "Unrecognized character found in source."));
+                        errorCallback(new(filedir, line, col, SyntaxErrorData.New(SyntaxErrorLevel.Error, "Unrecognized character found in source.")));
                     }
                 }
             }

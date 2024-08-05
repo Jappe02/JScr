@@ -1,3 +1,41 @@
-export int abs(int a) {
-    print("Coming soon!");
+//export const double epsilon = 4.94065645841247E-324;
+
+export double abs(double a) {
+    if (a < 0d) return a * -1d;
+    return a;
 }
+
+object MO {
+    int integer: 7,
+    void function(char) someLambda: lambda (p) => print(p),
+}
+
+// Create instance
+MO obj{ integer: 50 };
+/*
+export double sqrt(double x) {
+  if (x < 0) {
+    throw ArgumentError('sqrt: Negative argument');
+  }
+  return _sqrt(x);
+}
+
+double _sqrt(double x) {
+  if (x.isNaN) return double.nan;
+  if (x == 0.0 || x == 1.0) return x;
+
+  double low = 0.0;
+  double high = x;
+  double guess = x / 2.0;
+
+  while (abs((guess * guess - x)) > pow(1 * 10, -12)) {
+    if (guess * guess > x) {
+      high = guess;
+    } else {
+      low = guess;
+    }
+    guess = (low + high) / 2.0;
+  }
+
+  return guess;
+}*/

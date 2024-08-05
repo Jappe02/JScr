@@ -1,7 +1,17 @@
-﻿using System.Text.Json;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
 
 namespace JScr.Frontend
 {
+    public enum SyntaxErrorLevel
+    {
+        Message,
+        Warning,
+        Error,
+    }
+
+    /// <summary>An exception that wraps a [SyntaxError].</summary>
     public class SyntaxException : Exception
     {
         public SyntaxError Error { get; private set; }
@@ -16,23 +26,27 @@ namespace JScr.Frontend
 
     public class SyntaxError
     {
-        public string Filedir { get; private set; }
-        public uint   Line { get; private set; }
-        public uint   Col { get; private set; }
-        public long   ErrCode { get; private set; }
-        public string Description { get; private set; }
+        public string          Filedir { get; private set; }
+        public uint            Line { get; private set; }
+        public uint            Col { get; private set; }
+        public long            ErrCode { get; private set; }
+        public SyntaxErrorData Data { get; private set; }
 
-        internal SyntaxError(string filedir, uint line, uint col, string description)
+        private readonly string asString;
+
+        internal SyntaxError(string filedir, uint line, uint col, SyntaxErrorData data)
         {
-            long errorCode = GenerateErrorCode(description);
+            long errorCode = GenerateErrorCode(data.Description);
 
             Filedir = Path.GetFullPath(filedir);
             Line = line;
             Col = col;
             ErrCode = errorCode;
-            Description = description;
+            Data = data;
 
             errCodes.Add(errorCode);
+
+            asString = CreateString();
         }
 
         private static long GenerateErrorCode(string errCode)
@@ -49,9 +63,96 @@ namespace JScr.Frontend
 
         private static readonly List<long> errCodes = new();
 
-        public static SyntaxError Unknown(string filedir, uint line, uint col) => new(filedir, line, col, "Unknown syntax error!");
+        //public static SyntaxError Unknown(string filedir, uint line, uint col) => new(filedir, line, col, "Unknown syntax error!");
 
-        public override string ToString() => $"Syntax error at: \"{Filedir}\" [{Line}:{Col}] ({ErrCode}) \"{Description}\"";
+        private string CreateString()
+        {
+            string linestr = Line.ToString();
+
+            string LineNumber(bool hideNum = false)
+            {
+                string ret = string.Empty;
+
+                if (hideNum)
+                {
+                    for (int i = 0; i < linestr.Length; i++)
+                        ret += " ";
+                }
+                else
+                {
+                    ret = linestr;
+                }
+
+                ret += " | ";
+                return ret;
+            }
+
+            string ReadLine()
+            {
+                string err = "Failed to output error message to the console.";
+                string? line;
+
+                try
+                {
+                    line = File.ReadLines(Filedir).Skip((int)Line - 1).FirstOrDefault();
+                }
+                catch (Exception e)
+                {
+                    throw new Exception(err + " : " + e);
+                }
+
+                if (line == null)
+                    throw new Exception(err);
+
+                return line;
+            }
+
+            string fullLine = ReadLine();
+
+            string str = $"\n{Data.Level.ToString().ToLower()}({ErrCode}): {Data.Description}";
+            str += $"\n --> {Filedir} [{Line}:{Col}]";
+            str += $"\n{LineNumber(true)}";
+            str += $"\n{LineNumber()}{fullLine}";
+            str += $"\n{LineNumber(true)}";
+
+            for (int i = 0; i < Col; i++)
+                str += "-";
+
+            str += "^";
+
+            foreach (string hint in Data.Hints)
+            {
+                str += "\n --> hint: " + hint;
+            }
+
+            return str;
+        }
+
+        public override string ToString() => asString;
+    }
+
+    public class SyntaxErrorData
+    {
+        public static SyntaxErrorData New(SyntaxErrorLevel level, string description)
+            => new(level, description);
+
+        public SyntaxErrorLevel Level { get; private set; }
+        public string Description { get; private set; }
+        public IReadOnlyList<string> Hints => hints.AsReadOnly();
+
+        private List<string> hints = new();
+
+        private SyntaxErrorData(SyntaxErrorLevel level, string description)
+        {
+            Level = level;
+            Description = description;
+        }
+
+        public SyntaxErrorData AddHint(string hint)
+        {
+            hints.Add(hint);
+            return this;
+        }
     }
 
     /*

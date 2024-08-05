@@ -6,6 +6,8 @@ namespace TestApp
 {
     class Program
     {
+        // FOR INTERPRETED VERSION
+        /*
         static void Main(string[] args)
         {
             Console.WriteLine("Loading script file...");
@@ -18,7 +20,7 @@ namespace TestApp
             {
                 try
                 {
-                    var exec = script.Script.Execute(false);
+                    var exec = script.Script!.Execute(false);
                     exec.Wait();
                 } catch (RuntimeException ex)
                 {
@@ -47,6 +49,30 @@ namespace TestApp
             }
 
             Console.WriteLine("Execution succeeded! Press any key to quit.");
+            Console.ReadLine();
+        }
+        */
+
+        static async Task Main(string[] args)
+        {
+            Console.WriteLine("Loading script file...");
+
+            bool error = false;
+            await JScrSourceFile.CompileAsync(@"C:\Test\test.jscr", null, (err) => {
+                Console.WriteLine();
+                Console.WriteLine($"> ERROR: {err}");
+                Console.WriteLine();
+                error = true;
+            });
+
+            if (error)
+            {
+                Console.WriteLine("Compilation failed with an error. Press any key to quit.");
+                Console.ReadLine();
+                return;
+            }
+
+            Console.WriteLine("Compilation succeeded! Press any key to quit.");
             Console.ReadLine();
         }
     }

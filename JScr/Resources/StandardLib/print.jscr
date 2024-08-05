@@ -1,4 +1,5 @@
-namespace;
+import ext.print;
 
 /// Prints a message to the console.
-public external("Print") void print(dynamic obj);
+@Extern("print", "WriteLine")
+export external void print(dynamic obj);

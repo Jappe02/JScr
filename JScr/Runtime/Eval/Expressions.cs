@@ -1,4 +1,5 @@
 ﻿using JScr.Frontend;
+using System.Linq.Expressions;
 using System.Net.Http.Headers;
 using System.Security;
 using System.Xml.Linq;
@@ -10,22 +11,22 @@ namespace JScr.Runtime.Eval
 {
     internal static class Expressions
     {
-        private static IntegerVal EvalNumericBinaryExpr(IntegerVal lhs, IntegerVal rhs, string operator_)
+        private static double EvalNumericBinaryExpr(double lhs, double rhs, string operator_)
         {
-            var result = 0;
+            var result = 0d;
             if (operator_ == "+")
-                result = lhs.Value + rhs.Value;
+                result = lhs + rhs;
             else if (operator_ == "-")
-                result = lhs.Value - rhs.Value;
+                result = lhs - rhs;
             else if (operator_ == "*")
-                result = lhs.Value * rhs.Value;
+                result = lhs * rhs;
             else if (operator_ == "/")
                 // TODO: Division by zero checks
-                result = lhs.Value / rhs.Value;
+                result = lhs / rhs;
             else
-                result = lhs.Value % rhs.Value;
+                result = lhs % rhs;
 
-            return new IntegerVal(result);
+            return result;
         }
 
         private static StringVal EvalStringBinaryExpr(StringVal lhs, StringVal rhs, string operator_)
@@ -44,7 +45,13 @@ namespace JScr.Runtime.Eval
 
             if (lhs.Type == ValueType.integer && rhs.Type == ValueType.integer)
             {
-                return EvalNumericBinaryExpr(lhs as IntegerVal, rhs as IntegerVal, binop.Operator);
+                return new IntegerVal(Convert.ToInt32(EvalNumericBinaryExpr((lhs as IntegerVal)!.Value, (rhs as IntegerVal)!.Value, binop.Operator)));
+            } else if (lhs.Type == ValueType.float_ || lhs.Type == ValueType.float_)
+            {
+                return new FloatVal((float)EvalNumericBinaryExpr((lhs as FloatVal)!.Value, (rhs as FloatVal)!.Value, binop.Operator));
+            } else if (lhs.Type == ValueType.double_ || lhs.Type == ValueType.double_)
+            {
+                return new DoubleVal(EvalNumericBinaryExpr((lhs as DoubleVal)!.Value, (rhs as DoubleVal)!.Value, binop.Operator));
             } else if (lhs.Type == ValueType.string_ && rhs.Type == ValueType.string_)
             {
                 return EvalStringBinaryExpr(lhs as StringVal, rhs as StringVal, binop.Operator);
@@ -54,10 +61,25 @@ namespace JScr.Runtime.Eval
             return new NullVal();
         }
 
+        // Lookup variables & static access to objects + enums.
         public static RuntimeVal EvalIdentifier(Identifier ident, Environment env)
         {
-            var val = env.LookupVar(ident.Symbol);
-            return val;
+            var variable = env.LookupVar(ident.Symbol, true);
+
+            if (variable != null)
+                return variable;
+
+            var enum_ = env.LookupEnum(ident.Symbol);
+
+            if (enum_ != null)
+                return enum_;
+
+            var object_ = env.LookupObject(ident.Symbol);
+
+            if (object_ != null)
+                return object_;
+
+            throw new RuntimeException($"The identifier \"{ident.Symbol}\" does not reference anything.");
         }
 
         public static RuntimeVal EvalAssignment(AssignmentExpr node, Environment env)
@@ -65,11 +87,10 @@ namespace JScr.Runtime.Eval
             if (node.Assigne.Kind != NodeType.Identifier)
                 throw new RuntimeException($"Invalid LMS inside assignment expr: {node.Assigne.ToJson()}");
 
-            var varname = (node.Assigne as Identifier).Symbol;
+            var varname = (node.Assigne as Identifier)!.Symbol;
             return env.AssignVar(varname, Interpreter.Evaluate(node.Value, env));
         }
 
-        // TODO: Allow each type to declare their own ways to compare other types and stuff. (= cleaner code).
         public static RuntimeVal EvalEqualityCheckExpr(EqualityCheckExpr node, Environment env)
         {
             var lhs = Interpreter.Evaluate(node.Left, env);
@@ -78,29 +99,29 @@ namespace JScr.Runtime.Eval
             switch (node.Operator)
             {
                 case EqualityCheckExpr.Type.Equals:
-                    return new BoolVal(lhs.Equals(rhs));
+                    return Types.Compare(lhs, rhs, Types.EqualityCheckOp.Equals);
                 case EqualityCheckExpr.Type.NotEquals:
-                    return new BoolVal(!lhs.Equals(rhs));
+                    return Types.Compare(lhs, rhs, Types.EqualityCheckOp.NotEquals);
                 case EqualityCheckExpr.Type.LessThan:
-                    return new BoolVal((lhs as IntegerVal).Value < (rhs as IntegerVal).Value);
+                    return Types.Compare(lhs, rhs, Types.EqualityCheckOp.LessThan);
                 case EqualityCheckExpr.Type.LessThanOrEquals:
-                    return new BoolVal((lhs as IntegerVal).Value <= (rhs as IntegerVal).Value);
+                    return Types.Compare(lhs, rhs, Types.EqualityCheckOp.LessThanOrEquals);
                 case EqualityCheckExpr.Type.MoreThan:
-                    return new BoolVal((lhs as IntegerVal).Value > (rhs as IntegerVal).Value);
+                    return Types.Compare(lhs, rhs, Types.EqualityCheckOp.MoreThan);
                 case EqualityCheckExpr.Type.MoreThanOrEquals:
-                    return new BoolVal((lhs as IntegerVal).Value >= (rhs as IntegerVal).Value);
+                    return Types.Compare(lhs, rhs, Types.EqualityCheckOp.MoreThanOrEquals);
 
                 case EqualityCheckExpr.Type.And:
                 {
                     if (lhs.Type == ValueType.boolean && rhs.Type == ValueType.boolean)
-                        return new BoolVal((lhs as BoolVal).Value && (rhs as BoolVal).Value);
-                    return new BoolVal(false);
+                        return new BoolVal((lhs as BoolVal)!.Value && (rhs as BoolVal)!.Value);
+                    throw new RuntimeException("The `and` operator can only be used within booleans.");
                 }
                 case EqualityCheckExpr.Type.Or:
                 {
                     if (lhs.Type == ValueType.boolean || rhs.Type == ValueType.boolean)
                         return new BoolVal((lhs as BoolVal)!.Value || (rhs as BoolVal)!.Value);
-                    return new BoolVal(false);
+                    throw new RuntimeException("The `or` operator can only be used within booleans.");
                 }
             }
 
@@ -120,26 +141,36 @@ namespace JScr.Runtime.Eval
 
         public static RuntimeVal EvalMemberExpr(MemberExpr node, Environment env)
         {
+            return Types.MemberOf(node, env);
+        }
+
+        private static double EvalNumericUnaryExpr(double obj, string operator_)
+        {
+            var result = 0d;
+            if (operator_ == "+")
+                result = +obj;
+            else
+                result = -obj;
+
+            return result;
+        }
+
+        public static RuntimeVal EvalUnaryExpr(UnaryExpr node, Environment env)
+        {
             var obj = Interpreter.Evaluate(node.Object, env);
 
-            if (obj.Type == ValueType.objectInstance && node.Property.Kind == NodeType.Identifier)
+            if (obj.Type == ValueType.integer)
             {
-                var p = (obj as ObjectInstanceVal)!.Properties.FirstOrDefault((prop) => prop.Key == (node.Property as Identifier)!.Symbol);
-
-                if (p == null)
-                    throw new RuntimeException($"Property does not exist in object.");
-
-                return p?.Value ?? new NullVal();
-            } else if (node.Object.Kind == NodeType.Identifier)
+                return new IntegerVal(Convert.ToInt32(EvalNumericUnaryExpr((obj as IntegerVal)!.Value, node.Operator)));
+            } else if (obj.Type == ValueType.float_)
             {
-                var iaEnv = env.LookupImportAlias((node.Object as Identifier)!.Symbol);
-                if (iaEnv != null)
-                {
-                    Interpreter.Evaluate(node.Property, iaEnv);
-                }
+                return new FloatVal((float)EvalNumericUnaryExpr((obj as FloatVal)!.Value, node.Operator));
+            } else if (obj.Type == ValueType.double_)
+            {
+                return new DoubleVal(EvalNumericUnaryExpr((obj as DoubleVal)!.Value, node.Operator));
             }
 
-            throw new RuntimeException($"This declaration type does not support member expressions.");
+            return new NullVal();
         }
 
         public static RuntimeVal EvalObjectConstructorExpr(ObjectConstructorExpr node, Environment env)
@@ -162,7 +193,6 @@ namespace JScr.Runtime.Eval
             return new ObjectInstanceVal(type.Data, newProps);
         }
 
-        // TODO: LambdaFn lookup variable or function return type to pass it to the callexpr
         public static RuntimeVal EvalCallExpr(CallExpr expr, Environment env)
         {
             var args = expr.Args.Select(arg => Interpreter.Evaluate(arg, env)).ToList();
@@ -185,7 +215,7 @@ namespace JScr.Runtime.Eval
                     for (int i = 0; i < func.Parameters.Length; i++)
                     {
                         var currType = Types.SuitableType(args.ElementAtOrDefault(i));
-                        anonymousParams.Add(new(true, false, currType, func.Parameters[i].Identifier, null));
+                        anonymousParams.Add(new(Array.Empty<AnnotationUsageDeclaration>(), true, Visibility.Private, currType, func.Parameters[i].Identifier, null));
                     }
                 }
                 
@@ -197,26 +227,39 @@ namespace JScr.Runtime.Eval
                     var variable = !isAnonymous ? func.Parameters[i] : anonymousParams[i];
                     var defaultVal = variable.Value != null ? Interpreter.Evaluate(variable.Value, scope) : new NullVal();
                     var currentArgValue = args.ElementAtOrDefault(i) ?? new NullVal();
-                    scope.DeclareVar(variable.Identifier, currentArgValue.Type == ValueType.null_ ? defaultVal : currentArgValue, variable.Constant, false, variable.Type);
+                    scope.DeclareVar(variable.Identifier, currentArgValue.Type == ValueType.null_ ? defaultVal : currentArgValue, variable.Constant, Visibility.Private, variable.Type);
                 }
 
-                var result = new NullVal() as RuntimeVal;
+                RuntimeVal? result = null;
                 // Evaluate the function body statement by statement.
                 foreach (var stmt in func.Body)
                 {
-                    if (stmt is ReturnDeclaration || func.InstantReturn)
+                    if (func.InstantReturn)
                     {
                         result = Interpreter.Evaluate(stmt, scope);
                         break;
                     }
 
-                    Interpreter.Evaluate(stmt, scope);
+                    try
+                    {
+                        Interpreter.Evaluate(stmt, scope);
+                    } catch (ThReturnStmt rs)
+                    {
+                        result = rs.ReturnValue;
+                        break;
+                    }
                 }
 
+                if (func.Type_ != Types.Type.Void() && result == null) {
+                    throw new RuntimeException("Not all code paths return a value.");
+                }
+
+                result ??= new NullVal();
+
                 // Check type, just for fun
-                if (result.Type != ValueType.null_ && func.Type_ != Types.Type.Void())
+                if (result!.Type != ValueType.null_ && func.Type_ != Types.Type.Void())
                 {
-                    if (Types.SuitableType(result) != func.Type_)
+                    if (!Types.SuitableType(result).Equals(func.Type_))
                         throw new RuntimeException("Returned type does not match function declaration type.");
                 }
 
@@ -251,10 +294,10 @@ namespace JScr.Runtime.Eval
 
             foreach (var item in expr.ParamIdents)
             {
-                parameters.Add(new(false, false, null, item.Symbol, null));
+                parameters.Add(new(Array.Empty<AnnotationUsageDeclaration>(), false, Visibility.Private, null, item.Symbol, null));
             }
 
-            return new FunctionVal(null, null, parameters.ToArray(), env, expr.Body, expr.InstantReturn);
+            return new FunctionVal(null, null, parameters.ToArray(), env, expr.Body, expr.IsExpressionLambda);
         }
     }
 }

@@ -1,6 +1,5 @@
-﻿using JScr.Runtime;
-using System.Text.Json;
-using static JScr.Runtime.Values;
+﻿using JScr.Typing;
+using Type = JScr.Typing.Type;
 
 namespace JScr.Frontend
 {
@@ -10,10 +9,15 @@ namespace JScr.Frontend
         {
             // STATEMENTS
             Program,
+            NamespaceStmt,
             ImportStmt,
+            BlockStmt,
+            AnnotationUsageDeclaration,
             VarDeclaration,
             FunctionDeclaration,
-            ObjectDeclaration,
+            StructDeclaration,
+            ClassDeclaration,
+            EnumDeclaration,
             ReturnDeclaration,
             DeleteDeclaration,
             IfElseDeclaration,
@@ -24,6 +28,8 @@ namespace JScr.Frontend
             AssignmentExpr,
             EqualityCheckExpr,
             MemberExpr,
+            StaticMemberExpr,
+            UnaryExpr,
             LambdaExpr,
             CallExpr,
             IndexExpr,
@@ -33,10 +39,25 @@ namespace JScr.Frontend
             Property,
             ArrayLiteral,
             NumericLiteral,
+            FloatLiteral,
+            DoubleLiteral,
             StringLiteral,
             CharLiteral,
             Identifier,
             BinaryExpr,
+        }
+
+        public enum Visibility : byte
+        {
+            Private,
+            Protected,
+            Public,
+        }
+
+        public enum InheritanceModifier : byte
+        {
+            Abstract,
+            Virtual,
         }
 
         public abstract class Stmt
@@ -54,6 +75,16 @@ namespace JScr.Frontend
             public Program(string fileDir, List<Stmt> body) : base(NodeType.Program) { FileDir = fileDir; Body = body; }
         }
 
+        public class NamespaceStmt : Stmt
+        {
+            public string[] Target { get; }
+
+            public NamespaceStmt(string[] target) : base(NodeType.NamespaceStmt)
+            {
+                Target = target;
+            }
+        }
+
         public class ImportStmt : Stmt
         {
             public string[] Target { get; }
@@ -66,19 +97,47 @@ namespace JScr.Frontend
             }
         }
 
+        public class BlockStmt : Stmt
+        {
+            public Stmt[] Body { get; }
+
+            public BlockStmt(Stmt[] body) : base(NodeType.BlockStmt)
+            {
+                Body = body;
+            }
+        }
+
+        public class AnnotationUsageDeclaration : Stmt
+        {
+            public string Ident { get; }
+            public Expr[] Args { get; }
+
+            public AnnotationUsageDeclaration(string ident, Expr[] args) : base(NodeType.AnnotationUsageDeclaration)
+            {
+                Ident = ident;
+                Args = args;
+            }
+        }
+
         public class VarDeclaration : Stmt
         {
-            public bool Constant { get; }
-            public bool Export { get; }
-            public Types.Type Type { get; }
+            public AnnotationUsageDeclaration[] AnnotatedWith { get; }
+            public bool IsConstant { get; }
+            public Visibility Visibility { get; }
+            public InheritanceModifier? Modifier { get; }
+            public bool IsOverride { get; }
+            public Type Type { get; }
             public string Identifier { get; }
             public Expr? Value { get; }
 
-            public VarDeclaration(bool constant, bool export, Types.Type? type, string identifier, Expr? value) : base(NodeType.VarDeclaration)
+            public VarDeclaration(AnnotationUsageDeclaration[] annotatedWith, bool constant, Visibility visibility, InheritanceModifier? modifier, bool override_, Type? type, string identifier, Expr? value) : base(NodeType.VarDeclaration)
             {
-                Constant = constant;
-                Export = export;
-                Type = type ?? Types.Type.Void();
+                AnnotatedWith = annotatedWith;
+                IsConstant = constant;
+                Visibility = visibility;
+                Modifier = modifier;
+                IsOverride = override_;
+                Type = type ?? Types.VoidType();
                 Identifier = identifier;
                 Value = value;
             }
@@ -86,36 +145,80 @@ namespace JScr.Frontend
 
         public class FunctionDeclaration : Stmt
         {
-            public bool Export { get; }
+            public AnnotationUsageDeclaration[] AnnotatedWith { get; }
+            public Visibility Visibility { get; }
+            public InheritanceModifier? Modifier { get; }
+            public bool IsOverride { get; }
             public VarDeclaration[] Parameters { get; }
             public string Name { get; }
-            public Types.Type Type { get; }
+            public Type Type { get; }
             public Stmt[] Body { get; }
             public bool InstantReturn { get; }
 
-            public FunctionDeclaration(bool export, VarDeclaration[] parameters, string name, Types.Type? type, Stmt[] body, bool instantReturn) : base(NodeType.FunctionDeclaration)
+            public FunctionDeclaration(AnnotationUsageDeclaration[] annotatedWith, Visibility visibility, InheritanceModifier? modifier, bool override_, VarDeclaration[] parameters, string name, Type? type, Stmt[] body, bool instantReturn) : base(NodeType.FunctionDeclaration)
             {
-                Export = export;
+                AnnotatedWith = annotatedWith;
+                Visibility = visibility;
+                Modifier = modifier;
+                IsOverride = override_;
                 Parameters = parameters;
                 Name = name;
-                Type = type ?? Types.Type.Void();
+                Type = type ?? Types.VoidType();
                 Body = body;
                 InstantReturn = instantReturn;
                 // TODO: Important keywords like `async` etc.
             }
         }
 
-        public class ObjectDeclaration : Stmt
+        public class StructDeclaration : Stmt
         {
-            public bool Export { get; }
+            public AnnotationUsageDeclaration[] AnnotatedWith { get; }
+            public Visibility Visibility { get; }
             public string Name { get; }
             public Property[] Properties { get; }
 
-            public ObjectDeclaration(bool export, string name, Property[] properties) : base(NodeType.ObjectDeclaration)
+            public StructDeclaration(AnnotationUsageDeclaration[] annotatedWith, Visibility visibility, string name, Property[] properties) : base(NodeType.StructDeclaration)
             {
-                Export = export;
+                AnnotatedWith = annotatedWith;
+                Visibility = visibility;
                 Name = name;
                 Properties = properties;
+            }
+        }
+
+        public class ClassDeclaration : Stmt
+        {
+            public AnnotationUsageDeclaration[] AnnotatedWith { get; }
+            public Visibility Visibility { get; }
+            public bool IsAbstract { get; }
+            public SimpleType Name { get; }
+            public SimpleType[] Derivants { get; }
+            public Stmt[] Body { get; }
+
+            public ClassDeclaration(AnnotationUsageDeclaration[] annotatedWith, Visibility visibility, bool abstract_, SimpleType name, SimpleType[] derivants, Stmt[] body) : base(NodeType.ClassDeclaration)
+            {
+                AnnotatedWith = annotatedWith;
+                Visibility = visibility;
+                IsAbstract = abstract_;
+                Name = name;
+                Derivants = derivants;
+                Body = body;
+            }
+        }
+
+        public class EnumDeclaration : Stmt
+        {
+            public AnnotationUsageDeclaration[] AnnotatedWith { get; }
+            public Visibility Visibility { get; }
+            public string Name { get; }
+            public string[] Entries { get; }
+
+            public EnumDeclaration(AnnotationUsageDeclaration[] annotatedWith, Visibility visibility, string name, string[] entries) : base(NodeType.EnumDeclaration)
+            {
+                AnnotatedWith = annotatedWith;
+                Visibility = visibility;
+                Name = name;
+                Entries = entries;
             }
         }
 
@@ -144,9 +247,9 @@ namespace JScr.Frontend
             public class IfBlock
             {
                 public Expr Condition { get; }
-                public Stmt[] Body { get; }
+                public Stmt Body { get; }
 
-                public IfBlock(Expr condition, Stmt[] body)
+                public IfBlock(Expr condition, Stmt body)
                 {
                     Condition = condition;
                     Body = body;
@@ -154,9 +257,9 @@ namespace JScr.Frontend
             }
 
             public IfBlock[] Blocks { get; }
-            public Stmt[]? ElseBody { get; }
+            public Stmt? ElseBody { get; }
 
-            public IfElseDeclaration(IfBlock[] blocks, Stmt[]? elseBody) : base(NodeType.IfElseDeclaration)
+            public IfElseDeclaration(IfBlock[] blocks, Stmt? elseBody) : base(NodeType.IfElseDeclaration)
             {
                 Blocks = blocks;
                 ElseBody = elseBody;
@@ -166,9 +269,9 @@ namespace JScr.Frontend
         public class WhileDeclaration : Stmt
         {
             public Expr Condition { get; }
-            public Stmt[] Body { get; }
+            public Stmt Body { get; }
 
-            public WhileDeclaration(Expr condition, Stmt[] body) : base(NodeType.WhileDeclaration)
+            public WhileDeclaration(Expr condition, Stmt body) : base(NodeType.WhileDeclaration)
             {
                 Condition = condition;
                 Body = body;
@@ -180,9 +283,9 @@ namespace JScr.Frontend
             public Stmt Declaration { get; }
             public Expr Condition { get; }
             public Expr Action { get; }
-            public Stmt[] Body { get; }
+            public Stmt Body { get; }
 
-            public ForDeclaration(Stmt declaration, Expr condition, Expr action, Stmt[] body) : base(NodeType.ForDeclaration)
+            public ForDeclaration(Stmt declaration, Expr condition, Expr action, Stmt body) : base(NodeType.ForDeclaration)
             {
                 Declaration = declaration;
                 Condition = condition;
@@ -281,26 +384,54 @@ namespace JScr.Frontend
         public class MemberExpr : Expr
         {
             public Expr Object { get; }
-            public Expr Property { get; }
+            public Expr Member { get; }
 
-            public MemberExpr(Expr object_, Expr property) : base(NodeType.MemberExpr)
+            public MemberExpr(Expr object_, Expr member) : base(NodeType.MemberExpr)
             {
                 Object = object_;
-                Property = property;
+                Member = member;
+            }
+        }
+
+        public class StaticMemberExpr : Expr
+        {
+            public Expr Object { get; }
+            public Expr Member { get; }
+
+            public StaticMemberExpr(Expr object_, Expr member) : base(NodeType.StaticMemberExpr)
+            {
+                Object = object_;
+                Member = member;
+            }
+        }
+
+        public class UnaryExpr : Expr
+        {
+            public Expr Object { get; }
+            public string Operator { get; }
+
+            public UnaryExpr(Expr object_, string operator_) : base(NodeType.UnaryExpr)
+            {
+                Object = object_;
+                Operator = operator_;
             }
         }
 
         public class LambdaExpr : Expr
         {
-            public Identifier[] ParamIdents { get; }
+            public AnnotationUsageDeclaration[] AnnotatedWith { get; }
+            public VarDeclaration[] Parameters { get; }
+            public Type? ReturnType { get; }
             public Stmt[] Body { get; }
-            public bool InstantReturn { get; }
+            public bool IsExpressionLambda { get; }
 
-            public LambdaExpr(Identifier[] paramIdents, Stmt[] body, bool instantReturn) : base(NodeType.LambdaExpr)
+            public LambdaExpr(AnnotationUsageDeclaration[] annotatedWith, VarDeclaration[] parameters, Type? returnType, Stmt[] body, bool isExpressionLambda) : base(NodeType.LambdaExpr)
             {
-                ParamIdents = paramIdents;
+                AnnotatedWith = annotatedWith;
+                Parameters = parameters;
+                ReturnType = returnType;
                 Body = body;
-                InstantReturn = instantReturn;
+                IsExpressionLambda = isExpressionLambda;
             }
         }
 
@@ -325,6 +456,20 @@ namespace JScr.Frontend
             public NumericLiteral(int value) : base(NodeType.NumericLiteral) { Value = value; }
         }
 
+        public class FloatLiteral : Expr
+        {
+            public float Value { get; }
+
+            public FloatLiteral(float value) : base(NodeType.FloatLiteral) { Value = value; }
+        }
+
+        public class DoubleLiteral : Expr
+        {
+            public double Value { get; }
+
+            public DoubleLiteral(double value) : base(NodeType.DoubleLiteral) { Value = value; }
+        }
+
         public class StringLiteral : Expr
         {
             public string Value { get; }
@@ -342,12 +487,12 @@ namespace JScr.Frontend
         public class Property : Expr
         {
             public string Key { get; }
-            public Types.Type Type { get; }
+            public Type Type { get; }
             public Expr? Value { get; }
 
-            public Property(string key, Types.Type? type, Expr? value) : base(NodeType.Property) {
+            public Property(string key, Type? type, Expr? value) : base(NodeType.Property) {
                 Key = key;
-                Type = type ?? Types.Type.Void();
+                Type = type ?? Types.VoidType();
                 Value = value;
             }
         }

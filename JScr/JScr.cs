@@ -1,9 +1,28 @@
 ﻿using JScr.Frontend;
-using JScr.Runtime;
-using JScr.StandardLib;
 
 namespace JScr
 {
+    public static class JScrSourceFile
+    {
+        public static async Task CompileAsync(string filedir, string? outdir, Action<SyntaxError> errorCallback)
+        {
+            string sourcesFilename = "build.sources";
+            string outSourceDir = outdir != null ? Path.Join(outdir, sourcesFilename) : Path.Join(filedir, "build", sourcesFilename);
+
+            await Task.Run(() =>
+            {
+                var parser = new Parser();
+                var data = File.ReadAllText(filedir);
+                var program = parser.ProduceAST(filedir, data, errorCallback);/*
+                var result = Transpiler.Transpiler.TranspileProgram(program, Array.Empty<JScrExternalResource>(), errorCallback);
+                var file = File.CreateText(outSourceDir);
+                file.Write(result);
+                */
+                // TODO: use C compiler to compile.
+            });
+        }
+    }
+    /*
     public class Script
     {
         public struct Result
@@ -33,15 +52,29 @@ namespace JScr
             }
         }
 
+        private static void BuildStandardLibraryResources(ref Script script)
+        {
+            // Math
+
+            script.resources.Add(new JScrExternalResourceFile(new[] { "jscr", "math" }, ResourceHandler.GetStandardLibResource("Math.math.jscr")!));
+
+            // Lang
+
+            script.resources.Add(new JScrExternalResourceFile(new[] { "jscr", "lang", "annotation_target" }, ResourceHandler.GetStandardLibResource("Lang.annotation_target.jscr")!));
+        }
+
         public const string fileExtension = ".jscr";
 
         public string FileDir { get; private set; } = "";
+        public bool IsRunning { get; private set; } = false;
+        
         private List<JScrExternalResource> resources = new();
-
         private Ast.Program? program;
-        private bool isRunning = false;
 
         private Script() { }
+        ~Script() {
+            while (IsRunning);
+        }
 
         /// <summary>
         /// Create a script from file, a script file should be the full directory with a file name
@@ -50,26 +83,25 @@ namespace JScr
         /// <param name="filedir">The path to the target script file.</param>
         /// <param name="externalResources"></param>
         /// <returns></returns>
-        public static Result FromFile(string filedir, List<JScrExternalResource>? externalResources = null)
+        public static Result FromFile(string filedir, Action<SyntaxError>? errorCallback = null, List<JScrExternalResource>? externalResources = null)
         {
             Script script = new();
             List<SyntaxError> errors = new();
 
+            var onError = (SyntaxError err) =>
+            {
+                errors.Add(err);
+                errorCallback?.Invoke(err);
+            };
+
             script.FileDir = filedir;
             script.resources = externalResources ?? new List<JScrExternalResource>();
 
-            script.resources.Add(new JScrExternalResourceFile(new[] { "jscr", "math" }, ResourceHandler.GetStandardLibResource("Math.math.jscr")));
-
-            try
-            {
-                var parser = new Parser();
-
-                var data = File.ReadAllText(script.FileDir);
-                script.program = parser.ProduceAST(script.FileDir, data);
-            } catch (SyntaxException e)
-            {
-                errors.Add(e.Error);
-            }
+            BuildStandardLibraryResources(ref script);
+            
+            var parser = new Parser();
+            var data = File.ReadAllText(script.FileDir);
+            script.program = parser.ProduceAST(script.FileDir, data, onError);
 
             return new Result(errors.Count < 1 ? script : null, errors);
         }
@@ -84,17 +116,17 @@ namespace JScr
         /// <exception cref="RuntimeException"></exception>
         public async Task Execute(bool anotherThread = true) {
             if (program == null) throw new InvalidOperationException("Cannot execute script while 'program' is null! The script needs to be initialised first.");
-            else if (isRunning) throw new InvalidOperationException("Cannot execute script while it already is running.");
+            else if (IsRunning) throw new InvalidOperationException("Cannot execute script while it already is running.");
 
-            isRunning = true;
+            IsRunning = true;
             if (anotherThread)
                 await Task.Run(() => Interpreter.EvaluateProgram(program, resources.ToArray()));
             else
                 Interpreter.EvaluateProgram(program, resources.ToArray());
 
-            isRunning = false;
+            IsRunning = false;
         }
-    }
+    }*/
 
     /// <summary>
     /// These externals need to be defined when the Script object is created.

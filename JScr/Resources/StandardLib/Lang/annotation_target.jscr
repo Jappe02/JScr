@@ -1,0 +1,6 @@
+export enum AnnotationTarget {
+    METHOD,
+    FIELD,
+    OBJECT,
+    ENUM,
+}

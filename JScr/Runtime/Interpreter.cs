@@ -19,6 +19,10 @@ namespace JScr.Runtime
             switch (astNode.Kind) {
                 case NodeType.NumericLiteral:
                     return new IntegerVal((astNode as NumericLiteral).Value);
+                case NodeType.FloatLiteral:
+                    return new FloatVal((astNode as FloatLiteral).Value);
+                case NodeType.DoubleLiteral:
+                    return new DoubleVal((astNode as DoubleLiteral).Value);
                 case NodeType.StringLiteral:
                     return new StringVal((astNode as StringLiteral).Value);
                 case NodeType.CharLiteral:
@@ -27,6 +31,8 @@ namespace JScr.Runtime
                     return Expressions.EvalIdentifier(astNode as Identifier, env);
                 case NodeType.MemberExpr:
                     return Expressions.EvalMemberExpr(astNode as MemberExpr, env);
+                case NodeType.UnaryExpr:
+                    return Expressions.EvalUnaryExpr(astNode as UnaryExpr, env);
                 case NodeType.ObjectConstructorExpr:
                     return Expressions.EvalObjectConstructorExpr(astNode as ObjectConstructorExpr, env);
                 case NodeType.ArrayLiteral:
@@ -55,6 +61,10 @@ namespace JScr.Runtime
                     return Statements.EvalFunctionDeclaration(astNode as FunctionDeclaration, env);
                 case NodeType.ObjectDeclaration:
                     return Statements.EvalObjectDeclaration(astNode as ObjectDeclaration, env);
+                case NodeType.EnumDeclaration:
+                    return Statements.EvalEnumDeclaration(astNode as EnumDeclaration, env);
+                case NodeType.ClassDeclaration:
+                    return Statements.EvalClassDeclaration(astNode as ClassDeclaration, env);
                 case NodeType.ReturnDeclaration:
                     return Statements.EvalReturnDeclaration(astNode as ReturnDeclaration, env);
                 case NodeType.DeleteDeclaration:

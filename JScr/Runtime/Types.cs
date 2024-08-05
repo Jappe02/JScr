@@ -1,13 +1,241 @@
-﻿using System;
+﻿using JScr.Frontend;
+using System;
+using System.Reflection.Emit;
 using System.Xml.Linq;
+using static JScr.Frontend.Ast;
 using static JScr.Runtime.Values;
 
 namespace JScr.Runtime
 {
     internal static class Types
     {
-        private static Dictionary<Type, string> types = new(){ { Type.Dynamic(), "dynamic" }, /*{ Type.Object(), "object" },*/ { Type.Void(), "void" }, { Type.Bool(), "bool" }, { Type.Int(), "int" }, { Type.String(), "string" }, { Type.Char(), "char" },};
+        /// <summary>Operators to compare values.</summary>
+        public enum EqualityCheckOp
+        {
+            Equals,
+            NotEquals,
+            MoreThan,
+            LessThan,
+            MoreThanOrEquals,
+            LessThanOrEquals,
+        }
+
+        /// <summary>List of reserved types and their string identifiers.</summary>
+        private static readonly Dictionary<Type, string> types = new()
+        {
+            { Type.Dynamic(), "dynamic" },
+            { Type.Void(),    "void"    }, 
+            { Type.Bool(),    "bool"    }, 
+            { Type.Int(),     "int"     }, 
+            { Type.Float(),   "float"   }, 
+            { Type.Double(),  "double"  }, 
+            { Type.String(),  "string"  }, 
+            { Type.Char(),    "char"    },
+        };
         public static IReadOnlyDictionary<Type, string> reservedTypesDict => types;
+
+        #region Type Specific Actions
+
+        public static RuntimeVal Convert(RuntimeVal val, Type to, bool fallbackToOriginalValue = false) // TODO: Use
+        {
+            switch (val.Type)
+            {
+                case Values.ValueType.integer:
+                {
+                    if (to == Type.Float())
+                        return new FloatVal((val as IntegerVal).Value);
+                    else if (to == Type.Double())
+                        return new DoubleVal((val as IntegerVal).Value);
+                    else if (to == Type.Bool())
+                        return new BoolVal((val as IntegerVal).Value > 0);
+
+                    break;
+                }
+                case Values.ValueType.float_:
+                {
+                    if (to == Type.Int())
+                        return new IntegerVal((int)(val as FloatVal).Value);
+                    else if (to == Type.Double())
+                        return new DoubleVal((val as FloatVal).Value);
+
+                    break;
+                }
+                case Values.ValueType.double_:
+                {
+                    if (to == Type.Int())
+                        return new IntegerVal((int)(val as DoubleVal).Value);
+                    else if (to == Type.Float())
+                        return new FloatVal((float)(val as DoubleVal).Value);
+
+                    break;
+                }
+                case Values.ValueType.char_:
+                {
+                    if (to == Type.Int())
+                        return new IntegerVal((val as CharVal).Value);
+
+                    break;
+                }
+                case Values.ValueType.boolean:
+                {
+                    if (to == Type.Int())
+                        return new IntegerVal((val as BoolVal).Value ? 1 : 0);
+
+                    break;
+                }
+            }
+
+            if (fallbackToOriginalValue)
+                return val;
+
+            throw new RuntimeException($"Failed to convert value of type \"{SuitableType(val)}\" to \"{to}\".");
+        }
+
+        /// <summary>
+        /// Handles comparison operators for types.
+        /// </summary>
+        /// <returns>The result of the comparison.</returns>
+        public static RuntimeVal Compare(RuntimeVal lhs, RuntimeVal rhs, EqualityCheckOp operator_)
+        {
+            if (lhs.Type != rhs.Type) return new BoolVal(false);
+
+            if (operator_ == EqualityCheckOp.Equals)
+                return new BoolVal(lhs.Equals(rhs));
+            else if (operator_ == EqualityCheckOp.NotEquals)
+                return new BoolVal(!lhs.Equals(rhs));
+
+            switch (lhs.Type)
+            {
+                case Values.ValueType.integer:
+                {
+                    if (operator_ == EqualityCheckOp.LessThan)
+                        return new BoolVal((lhs as IntegerVal).Value < (rhs as IntegerVal).Value);
+                    else if (operator_ == EqualityCheckOp.LessThanOrEquals)
+                        return new BoolVal((lhs as IntegerVal).Value <= (rhs as IntegerVal).Value);
+                    else if (operator_ == EqualityCheckOp.MoreThan)
+                        return new BoolVal((lhs as IntegerVal).Value > (rhs as IntegerVal).Value);
+                    else if (operator_ == EqualityCheckOp.MoreThanOrEquals)
+                        return new BoolVal((lhs as IntegerVal).Value >= (rhs as IntegerVal).Value);
+
+                    break;
+                }
+                case Values.ValueType.float_:
+                {
+                    if (operator_ == EqualityCheckOp.LessThan)
+                        return new BoolVal((lhs as FloatVal).Value < (rhs as FloatVal).Value);
+                    else if (operator_ == EqualityCheckOp.LessThanOrEquals)
+                        return new BoolVal((lhs as FloatVal).Value <= (rhs as FloatVal).Value);
+                    else if (operator_ == EqualityCheckOp.MoreThan)
+                        return new BoolVal((lhs as FloatVal).Value > (rhs as FloatVal).Value);
+                    else if (operator_ == EqualityCheckOp.MoreThanOrEquals)
+                        return new BoolVal((lhs as FloatVal).Value >= (rhs as FloatVal).Value);
+
+                    break;
+                }
+                case Values.ValueType.double_:
+                {
+                    if (operator_ == EqualityCheckOp.LessThan)
+                        return new BoolVal((lhs as DoubleVal).Value < (rhs as DoubleVal).Value);
+                    else if (operator_ == EqualityCheckOp.LessThanOrEquals)
+                        return new BoolVal((lhs as DoubleVal).Value <= (rhs as DoubleVal).Value);
+                    else if (operator_ == EqualityCheckOp.MoreThan)
+                        return new BoolVal((lhs as DoubleVal).Value > (rhs as DoubleVal).Value);
+                    else if (operator_ == EqualityCheckOp.MoreThanOrEquals)
+                        return new BoolVal((lhs as DoubleVal).Value >= (rhs as DoubleVal).Value);
+
+                    break;
+                }
+            }
+
+            return new BoolVal(false);
+        }
+
+        /// <summary>
+        /// Handles member expressions for types.
+        /// Like `object.property` for example.
+        /// </summary>
+        /// <returns>The result of the expression.</returns>
+        public static RuntimeVal MemberOf(MemberExpr node, Environment env)
+        {
+            /// <summary>
+            /// Handles member expressions on type identifiers.
+            /// Like `int.max` for example.
+            /// </summary>
+            RuntimeVal? MemberOfType(RuntimeVal obj)
+            {
+                var type = FromString((node.Object as Identifier)!.Symbol);
+
+                if (type == Type.Int() && node.Property.Kind == NodeType.Identifier)
+                {
+                    var ident = (node.Property as Identifier)!.Symbol;
+
+                    if (ident == "max")
+                    {
+                        return new IntegerVal(int.MaxValue);
+                    } else if (ident == "min")
+                    {
+                        return new IntegerVal(int.MinValue);
+                    }
+                }
+
+                return null;
+            }
+
+            /// <summary>
+            /// Handles member expressions on variables values.
+            /// Like `myVar.prop` for example.
+            /// </summary>
+            RuntimeVal? MemberOfValue(RuntimeVal obj)
+            {
+                switch (obj.Type)
+                {
+                    case Values.ValueType.objectInstance:
+                    {
+                        if (node.Property.Kind != NodeType.Identifier) break;
+
+                        var p = (obj as ObjectInstanceVal)!.Properties.FirstOrDefault((prop) => prop.Key == (node.Property as Identifier)!.Symbol);
+
+                        if (p == null)
+                            throw new RuntimeException($"Property does not exist in object.");
+
+                        return p?.Value ?? new NullVal();
+                    }
+                    case Values.ValueType.enum_:
+                    {
+                        if (node.Property.Kind != NodeType.Identifier) break;
+
+                        var p = (obj as EnumVal)!.Entries.FirstOrDefault((prop) => prop.Key == (node.Property as Identifier)!.Symbol);
+
+                        if (p.Key == null)
+                            throw new RuntimeException($"Entry does not exist in enum.");
+
+                        return new IntegerVal(p.Value);
+                    }
+                }
+
+                return null;
+            }
+
+            var obj = Interpreter.Evaluate(node.Object, env);
+            RuntimeVal? value = null;
+
+            if (node.Object.Kind == NodeType.Identifier)
+            {
+                value = MemberOfType(obj);
+            }
+            
+            if (value == null) 
+            {
+                value = MemberOfValue(obj);
+            }
+
+            if (value != null) return value;
+
+            throw new RuntimeException($"This declaration type does not support member expressions.");
+        }
+
+        #endregion
+        #region Methods To Help With Types
 
         /// <summary>
         /// Convert a string to a Type. A trimmed version of the string will be used.
@@ -45,9 +273,9 @@ namespace JScr.Runtime
             Values.ValueType? valueType = runtimeVal?.Type;
 
             if (runtimeVal != null && valueType == Values.ValueType.function)
-                return ((FunctionVal)runtimeVal).Type_;
+                return ((FunctionVal)runtimeVal).Type_ ;
             else if (runtimeVal != null && valueType == Values.ValueType.nativeFn)
-                return ((NativeFnVal)runtimeVal).Type_;
+                return ((NativeFnVal)runtimeVal).Type_ ;
 
             switch (valueType)
             {
@@ -61,7 +289,7 @@ namespace JScr.Runtime
                         break;
 
                     var arrayVal = (ArrayVal)runtimeVal;
-                    Type? type = null;
+                    Type? type = null; // TODO: Array
                     bool dynamic = false;
                     foreach (var t in arrayVal.Value)
                     {
@@ -87,23 +315,31 @@ namespace JScr.Runtime
                     return Type.Object(objVal.ObjType);
                 }
                 case null: {
-                    return Type.Void();
+                    return Type.Void() ;
                 }
                 case Values.ValueType.boolean:
                 {
-                    return Type.Bool();
+                    return Type.Bool() ;
                 }
                 case Values.ValueType.integer:
                 {
-                    return Type.Int();
+                    return Type.Int() ;
+                }
+                case Values.ValueType.float_:
+                {
+                    return Type.Float();
+                }
+                case Values.ValueType.double_:
+                {
+                    return Type.Double();
                 }
                 case Values.ValueType.string_:
                 {
-                    return Type.String();
+                    return Type.String() ;
                 }
                 case Values.ValueType.char_:
                 {
-                    return Type.Char();
+                    return Type.Char() ;
                 }
             }
 
@@ -118,6 +354,8 @@ namespace JScr.Runtime
 
             return suitable != null ? suitable.Equals(type) : true;
         }
+
+        #endregion
 
         public class Type : IComparable<Type>
         {
@@ -139,12 +377,29 @@ namespace JScr.Runtime
             public static Type Void(Type[]? lambdaTypes = null) => new(3, lambdaTypes);
             public static Type Bool(Type[]? lambdaTypes = null) => new(4, lambdaTypes);
             public static Type Int(Type[]? lambdaTypes = null) => new(5, lambdaTypes);
-            public static Type String(Type[]? lambdaTypes = null) => new(6, lambdaTypes);
-            public static Type Char(Type[]? lambdaTypes = null) => new(7, lambdaTypes);
+            public static Type Float(Type[]? lambdaTypes = null) => new(6, lambdaTypes);
+            public static Type Double(Type[]? lambdaTypes = null) => new(7, lambdaTypes);
+            public static Type String(Type[]? lambdaTypes = null) => new(8, lambdaTypes);
+            public static Type Char(Type[]? lambdaTypes = null) => new(9, lambdaTypes);
 
             public int CompareTo(Type? other)
             {
                 return -1;
+            }
+
+            // Explicitly overload the == operator
+            public static bool operator ==(Type? left, Type? right)
+            {
+                if (ReferenceEquals(left, null))
+                    return ReferenceEquals(right, null);
+
+                return left.Equals(right);
+            }
+
+            // Explicitly overload the != operator
+            public static bool operator !=(Type? left, Type? right)
+            {
+                return !(left == right);
             }
 
             public override bool Equals(object? obj)
@@ -189,17 +444,5 @@ namespace JScr.Runtime
                 return new Type(Val, lambdaTypes ?? LambdaTypes, child ?? Child, data ?? Data);
             }
         }
-
-        /*
-        public enum Type : ushort
-        {
-            Dynamic,
-            Object,
-            Void,
-            Bool,
-            Int,
-            String,
-            Char,
-        }*/
     }
 }

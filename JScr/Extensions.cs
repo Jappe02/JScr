@@ -19,13 +19,13 @@ namespace JScr
     internal static class ListExtensions
     {
         /// <summary>
-        /// Removes the first element from a list and returns it.
+        /// Removes the first + offset element from a list and returns it.
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="list"></param>
         /// <returns>The removed item.</returns>
         /// <exception cref="InvalidOperationException"></exception>
-        public static T Shift<T>(this List<T> list)
+        public static T Shift<T>(this List<T> list, int offset = 0)
         {
             if (list.Count == 0)
             {
@@ -50,6 +50,14 @@ namespace JScr
         public static string ToJson(this object obj)
         {
             return JsonConvert.SerializeObject(obj);
+        }
+    }
+
+    internal static class StringExtensions
+    {
+        public static void Space(this string str)
+        {
+            str += " ";
         }
     }
 }

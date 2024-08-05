@@ -1,5 +1,6 @@
 ﻿using JScr.Frontend;
 using System;
+using System.Xml.Linq;
 using static JScr.Frontend.Ast;
 using static JScr.Runtime.Values;
 using static JScr.Script;
@@ -13,7 +14,14 @@ namespace JScr.Runtime.Eval
             RuntimeVal lastEvaluated = new NullVal();
             foreach (var statement in program.Body)
             {
-                lastEvaluated = Interpreter.Evaluate(statement, env);
+                try
+                {
+                    lastEvaluated = Interpreter.Evaluate(statement, env);
+                } catch (IStatementThrowable)
+                {
+                    throw new RuntimeException("Cannot use (some of | any of) return, continue, or break keywords in this scope.");
+                }
+                
             }
             return lastEvaluated;
         }
@@ -38,7 +46,7 @@ namespace JScr.Runtime.Eval
                     var parser = new Parser();
 
                     var data = externalFile.internalFile;
-                    program = parser.ProduceAST(otherFileDir, data);
+                    program = parser.ProduceAST(otherFileDir, data, _ => throw new Exception("Runtime parsing exception!"));
                 } catch (SyntaxException e)
                 {
                     FileLoadError(otherFileDir, e);
@@ -51,14 +59,14 @@ namespace JScr.Runtime.Eval
                     var parser = new Parser();
 
                     var data = File.ReadAllText(otherFileDir);
-                    program = parser.ProduceAST(otherFileDir, data);
+                    program = parser.ProduceAST(otherFileDir, data, _ => throw new Exception("Runtime parsing exception!"));
                 } catch (SyntaxException e)
                 {
                     FileLoadError(otherFileDir, e);
                 }
             }
 
-            var evaluationScope = new Environment(env, env.externalResources, true);
+            var evaluationScope = new Environment(env, ScopeType.Global, env.externalResources, true);
             env.DeclareImport(evaluationScope, otherFileDir, declaration.Alias);
 
             return EvalProgram(program, evaluationScope);
@@ -67,19 +75,20 @@ namespace JScr.Runtime.Eval
         public static RuntimeVal EvalVarDeclaration(VarDeclaration declaration, Environment env)
         {
             var value = declaration.Value != null ? Interpreter.Evaluate(declaration.Value, env) : new NullVal();
-            return env.DeclareVar(declaration.Identifier, value, declaration.Constant, declaration.Export, declaration.Type);
+            return env.DeclareVar(declaration.Identifier, value, declaration.Constant, declaration.Visibility, declaration.Type, declaration.AnnotatedWith);
         }
 
         public static RuntimeVal EvalFunctionDeclaration(FunctionDeclaration declaration, Environment env)
         {
             var fn = new FunctionVal(declaration.Name, declaration.Type, declaration.Parameters, env, declaration.Body, declaration.InstantReturn);
 
-            return env.DeclareVar(declaration.Name, fn, true, declaration.Export, declaration.Type);
+            return env.DeclareVar(declaration.Name, fn, true, declaration.Visibility, declaration.Type, declaration.AnnotatedWith);
         }
 
         public static RuntimeVal EvalObjectDeclaration(ObjectDeclaration obj, Environment env)
         {
             var props = new List<ObjectVal.Property>();
+            ArrayVal? annotationTargets = null;
             foreach (var prop in obj.Properties)
             {
                 var key = prop.Key;
@@ -91,16 +100,49 @@ namespace JScr.Runtime.Eval
                 if (!Types.RuntimeValMatchesType(type, runtimeVal))
                     throw new RuntimeException("Type and value do not match in object expression.");
 
+                if (key == "targets" && type == Types.Type.Array(Types.Type.Int()))
+                {
+                    annotationTargets = (ArrayVal?)runtimeVal;
+                    continue;
+                }
+
                 props.Add(new ObjectVal.Property(key, type, runtimeVal));
             }
-            return env.DeclareObject(new ObjectVal(obj.Export, obj.Name, props));
+            return env.DeclareObject(new ObjectVal(obj.Visibility, obj.Name, props, annotationTargets), obj.AnnotatedWith);
+        }
+
+        public static RuntimeVal EvalEnumDeclaration(EnumDeclaration obj, Environment env)
+        {
+            var entries = new Dictionary<string, ushort>();
+            for (ushort i = 0; i < obj.Entries.Length; i++)
+            {
+                entries.Add(obj.Entries[i], i);
+            }
+            return env.DeclareEnum(new EnumVal(obj.Visibility, obj.Name, entries), obj.AnnotatedWith);
+        }
+
+        public static RuntimeVal EvalClassDeclaration(ClassDeclaration obj, Environment env)
+        {
+            //var scope = new Environment(env, ScopeType.Class);
+            //foreach (var stmt in obj.Body)
+            //{
+            //    Interpreter.Evaluate(stmt, scope);
+            //}
+
+            var derivants = new List<ClassVal>();
+            foreach (var d in obj.Derivants)
+            {
+                env.LookupClass(obj.Name);
+            }
+
+            return env.DeclareClass(new ClassVal(obj.Visibility, obj.Name, derivants.ToArray(), obj.Body), obj.AnnotatedWith);
         }
 
         public static RuntimeVal EvalReturnDeclaration(ReturnDeclaration declaration, Environment env)
         {
             var value = declaration.Value != null ? Interpreter.Evaluate(declaration.Value, env) : new NullVal();
 
-            return value;
+            throw new ThReturnStmt(value);
         }
 
         public static RuntimeVal EvalDeleteDeclaration(DeleteDeclaration declaration, Environment env)
@@ -121,7 +163,7 @@ namespace JScr.Runtime.Eval
                     throw new RuntimeException("If statement condition needs to be a boolean.");
 
                 // Continue to next iteration if the value is false
-                if (!(val as BoolVal).Value) continue;
+                if (!(val as BoolVal)!.Value) continue;
 
                 // If the value is true, execute statement body and return
                 var scope = new Environment(env);
@@ -153,7 +195,7 @@ namespace JScr.Runtime.Eval
             if (val.Type != Values.ValueType.boolean)
                 throw new RuntimeException("While statement condition needs to be a boolean.");
 
-            while ((val as BoolVal).Value)
+            while ((val as BoolVal)!.Value)
             {
                 val = Interpreter.Evaluate(declaration.Condition, env);
 
@@ -176,7 +218,7 @@ namespace JScr.Runtime.Eval
             if (condition.Type != Values.ValueType.boolean)
                 throw new RuntimeException("For statement condition needs to be a boolean.");
 
-            while ((condition as BoolVal).Value)
+            while ((condition as BoolVal)!.Value)
             {
                 foreach (var stmt in declaration.Body)
                 {
