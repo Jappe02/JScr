@@ -1,13 +1,12 @@
 ﻿using JScr.CsImpl;
 
-namespace JScr.StandardExternalRes
+namespace JScr.StandardExternalRes;
+
+[JScrClassTarget("")]
+internal class Print
 {
-    [JScrClassTarget("")]
-    internal class Print
-    {
-        [JScrMethodTarget("print")]
-        public static void WriteLine(dynamic obj) {
-            Console.WriteLine(obj);
-        }
+    [JScrMethodTarget("print")]
+    public static void WriteLine(dynamic obj) {
+        Console.WriteLine(obj);
     }
 }

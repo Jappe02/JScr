@@ -37,15 +37,15 @@ namespace JScr.Transpiler.Transpile
 
             return new(Transpiler.Transpile(node.Left, env).ToString() + opstr + Transpiler.Transpile(node.Right, env).ToString());
         }
-
+        /*
         public static TPString TPArrayExpr(ArrayLiteral obj, Environment env)
         {
             return new();
         }
-
+        */
         public static TPString TPMemberExpr(MemberExpr node, Environment env)
         {
-            return new(Transpiler.Transpile(node.Object, env).ToString() + "." + Transpiler.Transpile(node.Member, env).ToString());
+            return new(Transpiler.Transpile(node.Left, env).ToString() + "." + Transpiler.Transpile(node.Right, env).ToString());
         }
 
         public static TPString TPUnaryExpr(UnaryExpr node, Environment env)
@@ -95,7 +95,7 @@ namespace JScr.Transpiler.Transpile
             {
                 var funcdecl = new TPString("");
                 var type = expr.ReturnType;
-                funcdecl += Statements.TPFunctionDeclaration(new FunctionDeclaration(Array.Empty<AnnotationUsageDeclaration>(), Visibility.Private, expr.Parameters, Helpers.RandomName("lambda"), type, expr.Body, expr.IsExpressionLambda), env, out var funcname);
+                funcdecl += Statements.TPFunctionDeclaration(new FunctionDeclaration(expr.Range, expr.AnnotatedWith, Visibility.Private, null, false, false, expr.Parameters, Helpers.RandomName("lambda"), type, expr.Body, expr.IsExpressionLambda), env, out var funcname);
                 functionName = funcname;
 
                 env.top.Add(funcdecl.ToString());

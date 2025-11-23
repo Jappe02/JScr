@@ -1,4 +1,6 @@
-﻿using static JScr.Frontend.Ast;
+﻿using JScr.Frontend;
+using System.Xml.Linq;
+using static JScr.Frontend.Ast;
 
 namespace JScr.Transpiler.Transpile
 {
@@ -30,7 +32,7 @@ namespace JScr.Transpiler.Transpile
             }
             else
             {
-                env.errorCallback(new(env.filedir, 0, 0, "Cannot declare variable outside of a class."));
+                env.errorCallback(new(env.filedir, declaration.Range, SyntaxErrorData.New(SyntaxErrorLevel.Error, "Cannot declare variable outside of a class.")));
             }
 
             if (declaration.IsConstant)
@@ -51,7 +53,7 @@ namespace JScr.Transpiler.Transpile
             else
             {
                 if (declaration.IsConstant)
-                    env.errorCallback(new(env.filedir, 0, 0, "Cannot declare constant variable without a value."));
+                    env.errorCallback(new(env.filedir, declaration.Range, SyntaxErrorData.New(SyntaxErrorLevel.Error, "Cannot declare constant variable without a value.")));
             }
 
             if (!env.NoSemicolons)
@@ -78,7 +80,7 @@ namespace JScr.Transpiler.Transpile
             }
 
             if (classname == string.Empty)
-                env.errorCallback(new(env.filedir, 0, 0, "Cannot declare function outside of a class."));
+                env.errorCallback(new(env.filedir, declaration.Range, SyntaxErrorData.New(SyntaxErrorLevel.Error, "Cannot declare function outside of a class.")));
 
             returnVal += declaration.Type.ToString();
             returnVal.Space();
@@ -132,7 +134,7 @@ namespace JScr.Transpiler.Transpile
                 else if (stmt.Kind == NodeType.FunctionDeclaration)
                     functions.Add((FunctionDeclaration)stmt);
                 else
-                    env.errorCallback(new(env.filedir, 0, 0, "Classes can only contain variables and functions."));
+                    env.errorCallback(new(env.filedir, obj.Range, SyntaxErrorData.New(SyntaxErrorLevel.Error, "Classes can only contain variables and functions.")));
             }
 
             var scope = new ClassEnvironment(env, obj.Name.typename); // TODO: Generics

@@ -1,17 +1,16 @@
 ﻿using System.Reflection;
 
-namespace JScr.StandardLib
+namespace JScr.StandardLib;
+
+internal static class ResourceHandler
 {
-    internal static class ResourceHandler
+    public static string? GetStandardLibResource(string resourceName)
     {
-        public static string? GetStandardLibResource(string resourceName)
+        using (Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("JScr.Resources.StandardLib." + resourceName))
         {
-            using (Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("JScr.Resources.StandardLib." + resourceName))
+            using (var reader = new StreamReader(stream))
             {
-                using (var reader = new StreamReader(stream))
-                {
-                    return reader.ReadToEnd();
-                }
+                return reader.ReadToEnd();
             }
         }
     }

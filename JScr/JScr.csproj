@@ -1,17 +1,30 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Copyright>Jappe Studios</Copyright>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <IsAotCompatible>True</IsAotCompatible>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <IsAotCompatible>True</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="Runtime\**" />
+    <Compile Remove="Transpiler\**" />
     <EmbeddedResource Remove="Runtime\**" />
+    <EmbeddedResource Remove="Transpiler\**" />
     <None Remove="Runtime\**" />
+    <None Remove="Transpiler\**" />
   </ItemGroup>
-
+  
   <ItemGroup>
     <None Remove="Resources\StandardLib\Lang\annotation_target.jscr" />
     <None Remove="Resources\StandardLib\Math\math.jscr" />

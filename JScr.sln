@@ -7,11 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JScr", "JScr\JScr.csproj", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestApp", "TestApp\TestApp.csproj", "{964A0747-8621-4FFE-9A1F-27FD7F4F3AF2}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VSCodeLanguageServer", "VSCodeLanguageServer\VSCodeLanguageServer.csproj", "{6ABD88DD-02A1-4DC2-AFA7-F128C6E0DC62}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JScr.TsBridge", "JScr.TsBridge\JScr.TsBridge.csproj", "{D8FEE8E4-FE89-44FB-BF97-D25FFCC46014}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildTools", "BuildTools\BuildTools.csproj", "{43F5AFF4-F9E4-4174-A2F4-F3D21F79FF37}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BuildTools", "BuildTools\BuildTools.csproj", "{43F5AFF4-F9E4-4174-A2F4-F3D21F79FF37}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,14 +23,6 @@ Global
 		{964A0747-8621-4FFE-9A1F-27FD7F4F3AF2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{964A0747-8621-4FFE-9A1F-27FD7F4F3AF2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{964A0747-8621-4FFE-9A1F-27FD7F4F3AF2}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6ABD88DD-02A1-4DC2-AFA7-F128C6E0DC62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6ABD88DD-02A1-4DC2-AFA7-F128C6E0DC62}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6ABD88DD-02A1-4DC2-AFA7-F128C6E0DC62}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6ABD88DD-02A1-4DC2-AFA7-F128C6E0DC62}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D8FEE8E4-FE89-44FB-BF97-D25FFCC46014}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D8FEE8E4-FE89-44FB-BF97-D25FFCC46014}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D8FEE8E4-FE89-44FB-BF97-D25FFCC46014}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D8FEE8E4-FE89-44FB-BF97-D25FFCC46014}.Release|Any CPU.Build.0 = Release|Any CPU
 		{43F5AFF4-F9E4-4174-A2F4-F3D21F79FF37}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{43F5AFF4-F9E4-4174-A2F4-F3D21F79FF37}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{43F5AFF4-F9E4-4174-A2F4-F3D21F79FF37}.Release|Any CPU.ActiveCfg = Release|Any CPU
